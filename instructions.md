@@ -28,6 +28,14 @@ npm test
 npm run dev
 ```
 
+## Local imports (in silico boundary)
+
+`artifact_import` with `source.kind=local_path` is only permitted under allowlisted prefixes. The default policy allows:
+
+- `/tmp`
+- `var/import`
+- `${GATEWAY_IMPORT_ROOT}` (expanded from the environment if set)
+
 ## Validation strategy
 
 - Unit tests validate: schema validation, policy gating, deterministic ID/checksum behavior, and provenance row creation.

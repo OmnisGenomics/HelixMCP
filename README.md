@@ -20,6 +20,7 @@ npm run dev
 
 - `DATABASE_URL` (optional): if unset, gateway uses in-memory Postgres (`pg-mem`) for dev.
 - `GATEWAY_POLICY_PATH` (default: `policies/default.policy.yaml`)
+- `GATEWAY_IMPORT_ROOT` (optional): expands `${GATEWAY_IMPORT_ROOT}` in `local_path_prefix_allowlist` for `artifact_import` with `local_path`.
 - `OBJECT_STORE_DIR` (default: `var/objects`)
 - `AUTO_SCHEMA` (default: `true`): apply `db/schema.sql` on startup (recommended for dev).
 

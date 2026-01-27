@@ -289,7 +289,13 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
       try {
         deps.policy.assertToolAllowed(toolName);
 
-        const canonicalParams: JsonObject = { project_id: projectId, limit: args.limit };
+        const snapshot = await deps.store.getArtifactListSnapshot(projectId);
+        const canonicalParams: JsonObject = {
+          project_id: projectId,
+          limit: args.limit,
+          as_of_created_at: snapshot.asOfCreatedAt,
+          artifact_count: snapshot.artifactCount
+        };
         const { runId, paramsHash } = deriveRunId({
           toolName,
           contractVersion,
@@ -324,8 +330,11 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
 
         await toolRun.start();
         started = true;
-        const artifacts = await deps.artifacts.listArtifacts(projectId, args.limit);
-        const structured = await toolRun.finishSuccess({ artifacts: artifacts.map(toArtifactSummary) }, `count=${artifacts.length}`);
+        const artifacts = await deps.artifacts.listArtifacts(projectId, args.limit, snapshot.asOfCreatedAt);
+        const structured = await toolRun.finishSuccess(
+          { as_of_created_at: snapshot.asOfCreatedAt, artifact_count: snapshot.artifactCount, artifacts: artifacts.map(toArtifactSummary) },
+          `count=${artifacts.length}`
+        );
 
         return {
           content: [{ type: "text", text: `Artifacts: ${artifacts.length}` }],

@@ -23,7 +23,8 @@ imports:
   allow_source_kinds: ["inline_text", "local_path"]
   local_path_prefix_allowlist:
     - "/tmp"
-    - "/home/chris/HelixMCP"
+    - "var/import"
+    - "${GATEWAY_IMPORT_ROOT}"
   deny_symlinks: true
 
 tools:

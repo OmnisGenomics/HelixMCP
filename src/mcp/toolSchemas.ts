@@ -70,6 +70,8 @@ export const zArtifactListInput = z.object({
 });
 
 export const zArtifactListOutput = zProvenance.extend({
+  as_of_created_at: z.string().nullable(),
+  artifact_count: z.string(),
   artifacts: z.array(zArtifactSummary),
   log_artifact_id: zArtifactId
 });

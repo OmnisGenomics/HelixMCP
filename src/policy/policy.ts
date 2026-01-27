@@ -28,6 +28,42 @@ function isPolicyConfig(value: unknown): value is PolicyConfig {
   return typeof obj.version === "number" && Array.isArray(obj.tool_allowlist);
 }
 
+function expandEnvToken(value: string): string | null {
+  const trimmed = value.trim();
+
+  const m1 = /^\$\{([A-Z0-9_]+)\}$/.exec(trimmed);
+  if (m1) {
+    const varName = m1[1];
+    if (!varName) return null;
+    const v = process.env[varName]?.trim();
+    return v ? v : null;
+  }
+
+  const m2 = /^\$([A-Z0-9_]+)$/.exec(trimmed);
+  if (m2) {
+    const varName = m2[1];
+    if (!varName) return null;
+    const v = process.env[varName]?.trim();
+    return v ? v : null;
+  }
+
+  return value;
+}
+
+function expandPolicyEnv(policy: PolicyConfig): PolicyConfig {
+  const prefixes = policy.imports.local_path_prefix_allowlist
+    .map((p) => expandEnvToken(p))
+    .filter((p): p is string => typeof p === "string" && p.trim().length > 0);
+
+  return {
+    ...policy,
+    imports: {
+      ...policy.imports,
+      local_path_prefix_allowlist: prefixes
+    }
+  };
+}
+
 export class PolicyEngine {
   readonly policyHash: `sha256:${string}`;
 
@@ -41,7 +77,7 @@ export class PolicyEngine {
     if (!isPolicyConfig(parsed)) {
       throw new Error(`invalid policy at ${filePath}`);
     }
-    return new PolicyEngine(parsed);
+    return new PolicyEngine(expandPolicyEnv(parsed));
   }
 
   snapshot(): Record<string, unknown> {

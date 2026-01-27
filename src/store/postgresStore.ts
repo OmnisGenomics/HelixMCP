@@ -19,6 +19,20 @@ function toIsoOrNull(value: unknown): string | null {
 export class PostgresStore {
   constructor(private readonly db: Kysely<DB>) {}
 
+  async getArtifactListSnapshot(projectId: ProjectId): Promise<{ artifactCount: string; asOfCreatedAt: string | null }> {
+    const row = await this.db
+      .selectFrom("artifacts")
+      .select(({ fn }) => [fn.countAll<string>().as("artifact_count"), fn.max("created_at").as("max_created_at")])
+      .where("project_id", "=", projectId)
+      .where("type", "!=", "LOG")
+      .executeTakeFirstOrThrow();
+
+    return {
+      artifactCount: String(row.artifact_count),
+      asOfCreatedAt: row.max_created_at ? toIso(row.max_created_at) : null
+    };
+  }
+
   async ensureProject(projectId: ProjectId, name: string | null = null): Promise<void> {
     await this.db
       .insertInto("projects")
@@ -102,14 +116,20 @@ export class PostgresStore {
     };
   }
 
-  async listArtifacts(projectId: ProjectId, limit: number): Promise<ArtifactRecord[]> {
-    const rows = await this.db
+  async listArtifacts(projectId: ProjectId, limit: number, asOfCreatedAt?: string | null): Promise<ArtifactRecord[]> {
+    if (asOfCreatedAt === null) return [];
+
+    let q = this.db
       .selectFrom("artifacts")
       .selectAll()
       .where("project_id", "=", projectId)
-      .orderBy("created_at desc")
-      .limit(limit)
-      .execute();
+      .where("type", "!=", "LOG");
+
+    if (asOfCreatedAt !== undefined) {
+      q = q.where("created_at", "<=", asOfCreatedAt);
+    }
+
+    const rows = await q.orderBy("created_at", "desc").orderBy("artifact_id", "desc").limit(limit).execute();
 
     return rows.map((row) => ({
       artifactId: row.artifact_id as ArtifactId,
@@ -205,6 +225,7 @@ export class PostgresStore {
     await this.db
       .insertInto("run_inputs")
       .values({ run_id: runId, artifact_id: artifactId, role })
+      .onConflict((oc) => oc.columns(["run_id", "artifact_id", "role"]).doNothing())
       .execute();
   }
 
@@ -212,6 +233,7 @@ export class PostgresStore {
     await this.db
       .insertInto("run_outputs")
       .values({ run_id: runId, artifact_id: artifactId, role })
+      .onConflict((oc) => oc.columns(["run_id", "artifact_id", "role"]).doNothing())
       .execute();
   }
 

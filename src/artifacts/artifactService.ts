@@ -65,8 +65,8 @@ export class ArtifactService {
     return this.store.getArtifact(artifactId);
   }
 
-  async listArtifacts(projectId: ProjectId, limit: number): Promise<ArtifactRecord[]> {
-    return this.store.listArtifacts(projectId, limit);
+  async listArtifacts(projectId: ProjectId, limit: number, asOfCreatedAt?: string | null): Promise<ArtifactRecord[]> {
+    return this.store.listArtifacts(projectId, limit, asOfCreatedAt);
   }
 
   async previewText(artifactId: ArtifactId, opts: { maxBytes: number; maxLines: number }): Promise<{ preview: string; truncated: boolean }> {

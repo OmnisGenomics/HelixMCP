@@ -112,6 +112,97 @@ describe("gateway (in-memory)", () => {
     expect(previewSc.preview).toContain("world");
   });
 
+  it("lists artifacts deterministically with snapshot replay", async () => {
+    const projectId = newProjectId();
+
+    const a1 = await client.request(
+      {
+        method: "tools/call",
+        params: {
+          name: "artifact_import",
+          arguments: {
+            project_id: projectId,
+            type_hint: "TEXT",
+            label: "a.txt",
+            source: { kind: "inline_text", text: "a\n" }
+          }
+        }
+      },
+      CallToolResultSchema
+    );
+    if (a1.isError) {
+      throw new Error(
+        `artifact_import failed: ${a1.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+      );
+    }
+
+    const list1 = await client.request(
+      { method: "tools/call", params: { name: "artifact_list", arguments: { project_id: projectId, limit: 100 } } },
+      CallToolResultSchema
+    );
+    if (list1.isError) {
+      throw new Error(
+        `artifact_list failed: ${list1.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+      );
+    }
+
+    const sc1 = list1.structuredContent as any;
+    expect(sc1.artifact_count).toBe("1");
+    expect(sc1.as_of_created_at).toBeTypeOf("string");
+    expect(sc1.artifacts).toHaveLength(1);
+
+    const list2 = await client.request(
+      { method: "tools/call", params: { name: "artifact_list", arguments: { project_id: projectId, limit: 100 } } },
+      CallToolResultSchema
+    );
+    if (list2.isError) {
+      throw new Error(
+        `artifact_list failed: ${list2.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+      );
+    }
+    const sc2 = list2.structuredContent as any;
+    expect(list2.content[0]?.type).toBe("text");
+    expect((list2.content[0] as any).text).toContain("Replayed");
+    expect(sc2).toEqual(sc1);
+
+    const a2 = await client.request(
+      {
+        method: "tools/call",
+        params: {
+          name: "artifact_import",
+          arguments: {
+            project_id: projectId,
+            type_hint: "TEXT",
+            label: "b.txt",
+            source: { kind: "inline_text", text: "b\n" }
+          }
+        }
+      },
+      CallToolResultSchema
+    );
+    if (a2.isError) {
+      throw new Error(
+        `artifact_import failed: ${a2.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+      );
+    }
+
+    const list3 = await client.request(
+      { method: "tools/call", params: { name: "artifact_list", arguments: { project_id: projectId, limit: 100 } } },
+      CallToolResultSchema
+    );
+    if (list3.isError) {
+      throw new Error(
+        `artifact_list failed: ${list3.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+      );
+    }
+
+    const sc3 = list3.structuredContent as any;
+    expect((list3.content[0] as any).text).not.toContain("Replayed");
+    expect(sc3.provenance_run_id).not.toBe(sc1.provenance_run_id);
+    expect(sc3.artifact_count).toBe("2");
+    expect(sc3.artifacts).toHaveLength(2);
+  });
+
   it(
     "runs simulated alignment and exports nextflow",
     async () => {
