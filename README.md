@@ -28,3 +28,7 @@ npm run dev
 
 - Stand up Postgres + object store (see `instructions.md`)
 - Implement real executors (Slurm/K8s adapters) behind the policy boundary
+
+## License
+
+Apache-2.0 (see `LICENSE`).
