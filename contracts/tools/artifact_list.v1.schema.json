@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:artifact_list:v1",
+  "title": "artifact_list input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project_id"],
+  "properties": {
+    "project_id": { "$ref": "helixmcp:common#/$defs/ProjectId" },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 100 },
+    "cursor": { "type": "string", "minLength": 1, "maxLength": 2048 }
+  }
+}
+

@@ -1,0 +1,32 @@
+{
+  "name": "helixmcp-biomcp-fabric",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.25.3",
+    "ajv": "8.17.1",
+    "kysely": "0.28.10",
+    "pg": "8.17.2",
+    "ulid": "3.0.2",
+    "yaml": "2.8.2",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.30",
+    "@types/pg": "8.16.0",
+    "pg-mem": "3.0.5",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3",
+    "vitest": "4.0.18"
+  }
+}

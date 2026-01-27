@@ -1,0 +1,33 @@
+version: 1
+
+# Default policy is intentionally conservative and deterministic.
+# Tighten further for multi-tenant deployments.
+
+tool_allowlist:
+  - artifact_import
+  - artifact_get
+  - artifact_list
+  - artifact_preview_text
+  - simulate_qc_fastq
+  - simulate_align_reads
+  - export_nextflow
+
+quotas:
+  max_threads: 16
+  max_runtime_seconds: 3600
+  max_import_bytes: 10737418240 # 10 GiB
+  max_preview_bytes: 8192
+  max_preview_lines: 200
+
+imports:
+  allow_source_kinds: ["inline_text", "local_path"]
+  local_path_prefix_allowlist:
+    - "/tmp"
+    - "/home/chris/HelixMCP"
+  deny_symlinks: true
+
+tools:
+  simulate_align_reads:
+    max_threads: 16
+  simulate_qc_fastq:
+    max_threads: 8

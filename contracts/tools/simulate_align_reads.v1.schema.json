@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:simulate_align_reads:v1",
+  "title": "simulate_align_reads input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project_id", "reads_1", "reference"],
+  "properties": {
+    "project_id": { "$ref": "helixmcp:common#/$defs/ProjectId" },
+    "reads_1": { "$ref": "helixmcp:common#/$defs/ArtifactId" },
+    "reads_2": { "$ref": "helixmcp:common#/$defs/ArtifactId" },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alias"],
+      "properties": {
+        "alias": { "type": "string", "minLength": 1, "maxLength": 64 }
+      }
+    },
+    "read_group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sm"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "sm": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "pl": { "type": "string", "minLength": 1, "maxLength": 64 }
+      }
+    },
+    "threads": { "type": "integer", "minimum": 1, "maximum": 64, "default": 8 },
+    "sort": { "type": "boolean", "default": true },
+    "mark_duplicates": { "type": "boolean", "default": false }
+  }
+}
+

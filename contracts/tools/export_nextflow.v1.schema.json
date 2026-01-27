@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:export_nextflow:v1",
+  "title": "export_nextflow input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["run_id"],
+  "properties": {
+    "run_id": { "$ref": "helixmcp:common#/$defs/RunId" }
+  }
+}
+

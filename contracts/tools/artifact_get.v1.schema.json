@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:artifact_get:v1",
+  "title": "artifact_get input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["artifact_id"],
+  "properties": {
+    "artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" }
+  }
+}
+

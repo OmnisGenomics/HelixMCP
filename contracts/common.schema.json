@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:common",
+  "title": "HelixMCP Common Types",
+  "type": "object",
+  "$defs": {
+    "Ulid26": {
+      "type": "string",
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "ProjectId": {
+      "type": "string",
+      "pattern": "^proj_[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "RunId": {
+      "type": "string",
+      "pattern": "^run_[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "ArtifactId": {
+      "type": "string",
+      "pattern": "^art_[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "Sha256": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "Timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ArtifactType": {
+      "type": "string",
+      "enum": [
+        "FASTQ_GZ",
+        "BAM",
+        "BAI",
+        "VCF",
+        "H5AD",
+        "TSV",
+        "CSV",
+        "JSON",
+        "TEXT",
+        "HTML",
+        "PDF",
+        "LOG",
+        "UNKNOWN"
+      ]
+    }
+  }
+}
+
