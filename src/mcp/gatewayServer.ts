@@ -1215,7 +1215,7 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
           if (artifact.checksumSha256 !== input.checksum_sha256) {
             throw new McpError(
               ErrorCode.InvalidParams,
-              `checksum mismatch for artifact ${artifactId} (expected ${artifact.checksumSha256}, got ${input.checksum_sha256})`
+              `checksum mismatch for artifact ${artifactId} (expected ${input.checksum_sha256}, got ${artifact.checksumSha256})`
             );
           }
 
@@ -1296,6 +1296,12 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
         const targetRun = await deps.store.getRun(targetRunId);
         if (!targetRun) throw new McpError(ErrorCode.InvalidParams, `unknown run_id: ${targetRunId}`);
 
+        const targetParams = await deps.store.getParamSet(targetRun.paramsHash);
+        const slurmOutputs = (((targetParams as any)?.slurm as any)?.io as any)?.outputs;
+        if (!Array.isArray(slurmOutputs)) {
+          throw new McpError(ErrorCode.InvalidRequest, `target run does not look like a slurm_submit run: ${targetRunId}`);
+        }
+
         const canonicalParams: JsonObject = {
           target_run_id: targetRunId
         };
@@ -1336,22 +1342,56 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
         started = true;
         await toolRun.event("collect.plan", `target_run_id=${targetRunId}`, null);
 
-        await deps.store.addRunEvent(targetRunId, "slurm.collect.start", "collect started", { collector_run_id: runId });
+        const finalized =
+          (targetRun.status === "succeeded" || targetRun.status === "failed") &&
+          typeof targetRun.finishedAt === "string" &&
+          targetRun.exitCode !== null;
+        if (finalized) {
+          const existingOutputs = await deps.store.listRunOutputs(targetRunId);
+          existingOutputs.sort((a, b) => a.role.localeCompare(b.role) || a.artifactId.localeCompare(b.artifactId));
 
-        const targetParams = await deps.store.getParamSet(targetRun.paramsHash);
-        const slurmOutputs = (((targetParams as any)?.slurm as any)?.io as any)?.outputs;
-        if (!Array.isArray(slurmOutputs)) {
-          throw new McpError(ErrorCode.InvalidRequest, `target run does not look like a slurm_submit run: ${targetRunId}`);
+          const byRoleExisting = new Map<string, ArtifactId>();
+          for (const o of existingOutputs) {
+            if (!byRoleExisting.has(o.role)) byRoleExisting.set(o.role, o.artifactId);
+          }
+
+          const artifactsByRole: Record<string, ArtifactId> = {};
+          for (const out of slurmOutputs as Array<any>) {
+            const role = String(out.role ?? "");
+            if (!role) continue;
+            const existing = byRoleExisting.get(role);
+            if (existing) artifactsByRole[role] = existing;
+          }
+
+          for (const role of ["stdout", "stderr"] as const) {
+            const existing = byRoleExisting.get(role);
+            if (existing) artifactsByRole[role] = existing;
+          }
+
+          const structured = await toolRun.finishSuccess(
+            { target_run_id: targetRunId, exit_code: targetRun.exitCode, artifacts_by_role: artifactsByRole },
+            "slurm collect (idempotent)"
+          );
+
+          return {
+            content: [{ type: "text", text: `slurm already finalized (target ${targetRunId})` }],
+            structuredContent: structured
+          };
         }
+
+        await deps.store.addRunEvent(targetRunId, "slurm.collect.start", "collect started", { collector_run_id: runId });
 
         const ws = await createRunWorkspace(deps.runsDir, targetRunId);
         const existingOutputs = await deps.store.listRunOutputs(targetRunId);
+        existingOutputs.sort((a, b) => a.role.localeCompare(b.role) || a.artifactId.localeCompare(b.artifactId));
         const byRoleExisting = new Map<string, ArtifactId>();
         for (const o of existingOutputs) {
           if (!byRoleExisting.has(o.role)) byRoleExisting.set(o.role, o.artifactId);
         }
 
         const artifactsByRole: Record<string, ArtifactId> = {};
+        const maxOutputBytes = deps.policy.slurmMaxCollectOutputBytes();
+        const maxLogBytes = deps.policy.slurmMaxCollectLogBytes();
 
         for (const out of slurmOutputs as Array<any>) {
           const role = String(out.role ?? "");
@@ -1378,7 +1418,7 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
             typeHint: type,
             label,
             createdByRunId: targetRunId,
-            maxBytes: null
+            maxBytes: maxOutputBytes
           });
 
           await deps.store.addRunOutput(targetRunId, artifact.artifactId, role);
@@ -1409,7 +1449,7 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
             typeHint: "LOG",
             label: `${role}.txt`,
             createdByRunId: targetRunId,
-            maxBytes: null
+            maxBytes: maxLogBytes
           });
           await deps.store.addRunOutput(targetRunId, artifact.artifactId, role);
           byRoleExisting.set(role, artifact.artifactId);

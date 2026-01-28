@@ -49,6 +49,7 @@ describe.sequential("slurm (stubbed)", () => {
 
     const policyConfig: PolicyConfig = {
       version: 1,
+      runtime: { instance_id: "test" },
       tool_allowlist: ["artifact_import", "artifact_get", "slurm_submit", "slurm_job_collect"],
       quotas: {
         max_threads: 16,
@@ -75,6 +76,8 @@ describe.sequential("slurm (stubbed)", () => {
         max_cpus: 32,
         max_mem_mb: 262144,
         max_gpus: 2,
+        max_collect_output_bytes: 1024 * 1024,
+        max_collect_log_bytes: 1024 * 1024,
         gpu_types_allowlist: [],
         apptainer: {
           image_allowlist: [APPTAINER_SAMTOOLS_IMAGE]
@@ -223,4 +226,3 @@ describe.sequential("slurm (stubbed)", () => {
     expect(submit2.structuredContent).toEqual(sc1);
   });
 });
-

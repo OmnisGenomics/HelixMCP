@@ -1,5 +1,10 @@
 version: 1
 
+# runtime.instance_id is included in policyHash to avoid accidental run_id collisions
+# across multiple gateway deployments sharing the same database.
+runtime:
+  instance_id: "local"
+
 # Default policy is intentionally conservative and deterministic.
 # Tighten further for multi-tenant deployments.
 

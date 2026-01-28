@@ -6,6 +6,9 @@ import { sha256Prefixed, stableJsonStringify } from "../core/canonicalJson.js";
 
 export interface PolicyConfig {
   version: number;
+  runtime?: {
+    instance_id: string;
+  };
   tool_allowlist: string[];
   quotas: {
     max_threads: number;
@@ -32,6 +35,8 @@ export interface PolicyConfig {
     max_cpus: number;
     max_mem_mb: number;
     max_gpus: number;
+    max_collect_output_bytes: number;
+    max_collect_log_bytes: number;
     gpu_types_allowlist?: string[];
     apptainer: {
       image_allowlist: string[];
@@ -226,6 +231,27 @@ export class PolicyEngine {
     if (networkMode !== "none") {
       throw new McpError(ErrorCode.InvalidRequest, `policy denied slurm network_mode: ${networkMode}`);
     }
+  }
+
+  slurmMaxCollectOutputBytes(): bigint {
+    const slurm = this.requireSlurm();
+    const value = slurm.max_collect_output_bytes;
+    if (!Number.isInteger(value) || value < 1) {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `policy denied slurm collect outputs (no max_collect_output_bytes configured)`
+      );
+    }
+    return BigInt(value);
+  }
+
+  slurmMaxCollectLogBytes(): bigint {
+    const slurm = this.requireSlurm();
+    const value = slurm.max_collect_log_bytes;
+    if (!Number.isInteger(value) || value < 1) {
+      throw new McpError(ErrorCode.InvalidRequest, `policy denied slurm collect logs (no max_collect_log_bytes configured)`);
+    }
+    return BigInt(value);
   }
 
   enforceThreads(toolName: string, requestedThreads: number | undefined): number {
