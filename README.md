@@ -5,6 +5,7 @@ Governed, reproducible MCP gateway skeleton for bioinformatics compute + databas
 - Artifact-first data model (handles, metadata, previews)
 - Policy-gated tool calls (allowlists + quotas)
 - Run/provenance capture (inputs, outputs, logs, checksums)
+- Docker execution backend (read-only rootfs, no network by default)
 - MCP server surface for intent-level tools
 
 This repository is intentionally **in silico** only: it focuses on deterministic execution, verification, and artifact/provenance handling as software.
@@ -22,6 +23,7 @@ npm run dev
 - `GATEWAY_POLICY_PATH` (default: `policies/default.policy.yaml`)
 - `GATEWAY_IMPORT_ROOT` (optional): expands `${GATEWAY_IMPORT_ROOT}` in `local_path_prefix_allowlist` for `artifact_import` with `local_path`.
 - `OBJECT_STORE_DIR` (default: `var/objects`)
+- `RUNS_DIR` (default: `var/runs`): per-run workspaces for tool execution.
 - `AUTO_SCHEMA` (default: `true`): apply `db/schema.sql` on startup (recommended for dev).
 
 ## Next steps

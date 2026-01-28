@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:seqkit_stats:v1",
+  "title": "seqkit_stats input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project_id", "input_artifact_id"],
+  "properties": {
+    "project_id": { "$ref": "helixmcp:common#/$defs/ProjectId" },
+    "input_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" },
+    "threads": { "type": "integer", "minimum": 1, "maximum": 64, "default": 2 }
+  }
+}
+

@@ -12,6 +12,16 @@ describe("PolicyEngine", () => {
     expect(() => policy.assertToolAllowed("definitely_not_allowed")).toThrow(McpError);
   });
 
+  it("enforces docker image allowlist", async () => {
+    const policy = await PolicyEngine.loadFromFile(path.resolve("policies/default.policy.yaml"));
+    expect(() =>
+      policy.assertDockerImageAllowed(
+        "quay.io/biocontainers/seqkit@sha256:67c9a1cfeafbccfd43bbd1fbb80646c9faa06a50b22c8ea758c3c84268b6765d"
+      )
+    ).not.toThrow();
+    expect(() => policy.assertDockerImageAllowed("docker.io/library/alpine:latest")).toThrow(McpError);
+  });
+
   it("enforces local_path prefix allowlist", async () => {
     const policy = await PolicyEngine.loadFromFile(path.resolve("policies/default.policy.yaml"));
     const dir = await mkdtemp(path.join(os.tmpdir(), "helixmcp-policy-"));

@@ -24,6 +24,13 @@ export interface DockerSpec {
   image: string;
   argv: string[];
   workdir?: string;
+  env?: Record<string, string>;
+  mounts?: Array<{ hostPath: string; containerPath: string; readOnly?: boolean }>;
+  network?: "none" | "bridge";
+  readOnlyRootFs?: boolean;
+  tmpfs?: Array<{ containerPath: string; options?: string }>;
+  user?: string;
+  containerName?: string;
 }
 
 export interface SlurmSpec {
@@ -38,4 +45,3 @@ export interface RunnerBackend<K extends ExecutionSpec["kind"] = ExecutionSpec["
   kind: K;
   execute(spec: Extract<ExecutionSpec, { kind: K }>, resources: ExecutionResources): Promise<ExecutionResult>;
 }
-

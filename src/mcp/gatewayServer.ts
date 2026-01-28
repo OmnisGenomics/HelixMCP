@@ -24,6 +24,8 @@ import {
   zArtifactPreviewTextOutput,
   zExportNextflowInput,
   zExportNextflowOutput,
+  zSeqkitStatsInput,
+  zSeqkitStatsOutput,
   zSimulateAlignReadsInput,
   zSimulateAlignReadsOutput,
   zSimulateQcFastqInput,
@@ -63,8 +65,11 @@ function envSnapshot(): JsonObject {
 export function createGatewayServer(deps: GatewayDeps): McpServer {
   const mcp = new McpServer({
     name: "helixmcp-biomcp-fabric-gateway",
-    version: "0.1.0"
+    version: "0.2.0"
   });
+
+  const SEQKIT_IMAGE =
+    "quay.io/biocontainers/seqkit@sha256:67c9a1cfeafbccfd43bbd1fbb80646c9faa06a50b22c8ea758c3c84268b6765d";
 
   mcp.registerTool(
     "artifact_import",
@@ -542,6 +547,7 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
 	        await toolRun.event("simulate.qc", `threads=${threads}`, null);
 
 	        const outcome = await deps.execution.execute({
+	          runId,
 	          toolName,
 	          resources: { threads, runtimeSeconds: deps.policy.maxRuntimeSeconds() },
 	          canonicalParams,
@@ -683,6 +689,7 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
 	        await toolRun.event("simulate.align", `reference=${args.reference.alias} threads=${threads}`, null);
 
 	        const outcome = await deps.execution.execute({
+	          runId,
 	          toolName,
 	          resources: { threads, runtimeSeconds: deps.policy.maxRuntimeSeconds() },
 	          canonicalParams,
@@ -721,6 +728,142 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
 	          content: [{ type: "text", text: `Alignment complete (run ${structured.provenance_run_id as string})` }],
 	          structuredContent: structured
 	        };
+      } catch (e) {
+        if (e instanceof McpError) {
+          if (toolRun && started) {
+            if (e.code === ErrorCode.InvalidRequest) await toolRun.finishBlocked(e.message);
+            else await toolRun.finishFailure(e.message);
+          }
+          throw e;
+        }
+        if (e instanceof Error) {
+          if (toolRun && started) await toolRun.finishFailure(e.message);
+          throw e;
+        }
+        if (toolRun && started) await toolRun.finishFailure("unknown error");
+        throw new Error("unknown error");
+      }
+    }
+  );
+
+  mcp.registerTool(
+    "seqkit_stats",
+    {
+      description: "Run seqkit stats in Docker on a sequence artifact (deterministic, policy-gated).",
+      inputSchema: zSeqkitStatsInput,
+      outputSchema: zSeqkitStatsOutput
+    },
+    async (args, extra) => {
+      const toolName = "seqkit_stats";
+      const contractVersion = "v1";
+      const projectId = args.project_id as ProjectId;
+      let toolRun: ToolRun | null = null;
+      let started = false;
+
+      try {
+        deps.policy.assertToolAllowed(toolName);
+        const threads = deps.policy.enforceThreads(toolName, args.threads);
+
+        const input = await deps.artifacts.getArtifact(args.input_artifact_id as ArtifactId);
+        if (!input) {
+          throw new McpError(ErrorCode.InvalidParams, `unknown input_artifact_id: ${args.input_artifact_id}`);
+        }
+
+        const canonicalParams: JsonObject = {
+          project_id: projectId,
+          input: {
+            checksum_sha256: input.checksumSha256,
+            type: input.type,
+            size_bytes: input.sizeBytes.toString()
+          },
+          threads,
+          docker: {
+            image: SEQKIT_IMAGE,
+            network_mode: deps.policy.dockerNetworkMode(),
+            argv: ["seqkit", "stats", "-T", "/work/in/input"]
+          }
+        };
+
+        const { runId, paramsHash } = deriveRunId({
+          toolName,
+          contractVersion,
+          policyHash: deps.policy.policyHash,
+          canonicalParams
+        });
+
+        const existing = await deps.store.getRun(runId);
+        if (existing?.status === "succeeded" && existing.resultJson) {
+          return {
+            content: [{ type: "text", text: `Replayed ${toolName} (${runId})` }],
+            structuredContent: existing.resultJson
+          };
+        }
+
+        toolRun = new ToolRun(
+          { store: deps.store, artifacts: deps.artifacts },
+          {
+            runId,
+            projectId,
+            toolName,
+            contractVersion,
+            toolVersion: SEQKIT_IMAGE,
+            paramsHash,
+            canonicalParams,
+            policyHash: deps.policy.policyHash,
+            requestedBy: requestedByFromExtra(extra),
+            policySnapshot: deps.policy.snapshot() as JsonObject,
+            environment: envSnapshot()
+          }
+        );
+
+        await toolRun.start();
+        started = true;
+        await toolRun.linkInput(input.artifactId, "input");
+        await toolRun.event("exec.plan", `backend=docker image=${SEQKIT_IMAGE}`, null);
+
+        const outcome = await deps.execution.execute({
+          runId,
+          toolName,
+          resources: { threads, runtimeSeconds: deps.policy.maxRuntimeSeconds() },
+          canonicalParams,
+          inputs: {
+            input
+          }
+        });
+
+        if (outcome.exec) {
+          await toolRun.event("exec.result", `exit=${outcome.exec.exitCode}`, {
+            backend: outcome.exec.backend,
+            started_at: outcome.exec.startedAt,
+            finished_at: outcome.exec.finishedAt,
+            stderr: outcome.exec.stderr
+          });
+        }
+
+        const outputIds: Record<string, ArtifactId> = {};
+        for (const out of outcome.outputs) {
+          const id = await toolRun.createOutputArtifact({
+            type: out.type,
+            label: out.label,
+            contentText: out.contentText,
+            role: out.role
+          });
+          outputIds[out.role] = id;
+        }
+
+        const reportArtifactId = outputIds["report"];
+        if (!reportArtifactId) throw new Error("missing report output");
+
+        const stats = (outcome.metrics as any).stats as unknown;
+        const structured = await toolRun.finishSuccess(
+          { report_artifact_id: reportArtifactId, stats: stats as JsonObject },
+          "seqkit stats ok"
+        );
+
+        return {
+          content: [{ type: "text", text: `seqkit stats complete (run ${structured.provenance_run_id as string})` }],
+          structuredContent: structured
+        };
       } catch (e) {
         if (e instanceof McpError) {
           if (toolRun && started) {

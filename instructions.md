@@ -36,6 +36,14 @@ npm run dev
 - `var/import`
 - `${GATEWAY_IMPORT_ROOT}` (expanded from the environment if set)
 
+## Execution workspaces
+
+Real tools run in a per-run workspace under `RUNS_DIR` (default: `var/runs`):
+
+- `in/` materialized inputs (from `artifact_id`)
+- `out/` tool outputs (captured and re-registered as new artifacts)
+- `meta/` execution metadata
+
 ## Validation strategy
 
 - Unit tests validate: schema validation, policy gating, deterministic ID/checksum behavior, and provenance row creation.

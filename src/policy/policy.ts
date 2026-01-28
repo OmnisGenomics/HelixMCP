@@ -19,6 +19,10 @@ export interface PolicyConfig {
     local_path_prefix_allowlist: string[];
     deny_symlinks?: boolean;
   };
+  docker?: {
+    network_mode?: "none" | "bridge";
+    image_allowlist: string[];
+  };
   tools?: Record<string, { max_threads?: number }>;
 }
 
@@ -94,6 +98,20 @@ export class PolicyEngine {
   assertToolAllowed(toolName: string): void {
     if (!this.policy.tool_allowlist.includes(toolName)) {
       throw new McpError(ErrorCode.InvalidRequest, `policy denied tool: ${toolName}`);
+    }
+  }
+
+  dockerNetworkMode(): "none" | "bridge" {
+    return this.policy.docker?.network_mode ?? "none";
+  }
+
+  assertDockerImageAllowed(image: string): void {
+    const allowlist = this.policy.docker?.image_allowlist ?? [];
+    if (!allowlist.length) {
+      throw new McpError(ErrorCode.InvalidRequest, `policy denied docker image (no allowlist configured): ${image}`);
+    }
+    if (!allowlist.includes(image)) {
+      throw new McpError(ErrorCode.InvalidRequest, `policy denied docker image: ${image}`);
     }
   }
 

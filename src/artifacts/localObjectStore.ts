@@ -91,5 +91,10 @@ export class LocalObjectStore {
       await fd.close();
     }
   }
-}
 
+  async materializeToPath(artifactId: ArtifactId, destPath: string): Promise<void> {
+    const sourcePath = this.objectPath(artifactId);
+    await fs.mkdir(path.dirname(destPath), { recursive: true });
+    await fs.copyFile(sourcePath, destPath);
+  }
+}

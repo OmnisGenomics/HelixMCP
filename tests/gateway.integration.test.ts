@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { mkdtemp, rm } from "fs/promises";
 import os from "os";
 import path from "path";
+import { execSync } from "child_process";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -19,6 +20,15 @@ import { PolicyEngine } from "../src/policy/policy.js";
 import { createGatewayServer } from "../src/mcp/gatewayServer.js";
 import { newProjectId } from "../src/core/ids.js";
 import { DefaultExecutionService } from "../src/execution/executionService.js";
+
+const DOCKER_AVAILABLE = (() => {
+  try {
+    execSync("docker version", { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+})();
 
 describe("gateway (in-memory)", () => {
   let tmpDir: string;
@@ -42,7 +52,7 @@ describe("gateway (in-memory)", () => {
     const objects = new LocalObjectStore(path.join(tmpDir, "objects"));
     const artifacts = new ArtifactService(store, objects);
     const policy = await PolicyEngine.loadFromFile(path.resolve("policies/default.policy.yaml"));
-    const execution = new DefaultExecutionService(policy);
+    const execution = new DefaultExecutionService({ policy, objects, workspaceRootDir: path.join(tmpDir, "runs") });
 
     server = createGatewayServer({ policy, store, artifacts, execution });
 
@@ -202,6 +212,99 @@ describe("gateway (in-memory)", () => {
     expect(sc3.artifact_count).toBe("2");
     expect(sc3.artifacts).toHaveLength(2);
   });
+
+  it.runIf(DOCKER_AVAILABLE)(
+    "runs seqkit stats via docker and replays",
+    async () => {
+      const projectId = newProjectId();
+
+      const fasta = await client.request(
+        {
+          method: "tools/call",
+          params: {
+            name: "artifact_import",
+            arguments: {
+              project_id: projectId,
+              type_hint: "TEXT",
+              label: "tiny.fasta",
+              source: { kind: "inline_text", text: ">seq1\nACGTACGT\n>seq2\nTTTT\n" }
+            }
+          }
+        },
+        CallToolResultSchema
+      );
+      if (fasta.isError) {
+        throw new Error(
+          `artifact_import failed: ${fasta.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+        );
+      }
+      const fastaId = (fasta.structuredContent as any).artifact.artifact_id as string;
+
+      const stats1 = await client.request(
+        {
+          method: "tools/call",
+          params: {
+            name: "seqkit_stats",
+            arguments: { project_id: projectId, input_artifact_id: fastaId, threads: 2 }
+          }
+        },
+        CallToolResultSchema
+      );
+      if (stats1.isError) {
+        throw new Error(
+          `seqkit_stats failed: ${stats1.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+        );
+      }
+
+      const sc1 = stats1.structuredContent as any;
+      expect(sc1.provenance_run_id).toMatch(/^run_/);
+      expect(sc1.report_artifact_id).toMatch(/^art_/);
+      expect(sc1.stats.num_seqs).toBe(2);
+      expect(sc1.stats.sum_len).toBe(12);
+      expect(sc1.stats.min_len).toBe(4);
+      expect(sc1.stats.avg_len).toBe(6);
+      expect(sc1.stats.max_len).toBe(8);
+
+      const report = await client.request(
+        { method: "tools/call", params: { name: "artifact_get", arguments: { artifact_id: sc1.report_artifact_id } } },
+        CallToolResultSchema
+      );
+      if (report.isError) {
+        throw new Error(
+          `artifact_get failed: ${report.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+        );
+      }
+      const reportSc = report.structuredContent as any;
+      expect(reportSc.artifact.type).toBe("TSV");
+      expect(reportSc.artifact.created_by_run_id).toBe(sc1.provenance_run_id);
+
+      const count1 = Number((await pool.query("SELECT COUNT(*) AS c FROM param_sets")).rows[0]?.c);
+
+      const stats2 = await client.request(
+        {
+          method: "tools/call",
+          params: {
+            name: "seqkit_stats",
+            arguments: { project_id: projectId, input_artifact_id: fastaId, threads: 2 }
+          }
+        },
+        CallToolResultSchema
+      );
+      if (stats2.isError) {
+        throw new Error(
+          `seqkit_stats failed: ${stats2.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+        );
+      }
+
+      const sc2 = stats2.structuredContent as any;
+      const count2 = Number((await pool.query("SELECT COUNT(*) AS c FROM param_sets")).rows[0]?.c);
+
+      expect((stats2.content[0] as any).text).toContain("Replayed");
+      expect(sc2).toEqual(sc1);
+      expect(count2).toBe(count1);
+    },
+    90_000
+  );
 
   it(
     "runs simulated alignment and exports nextflow",

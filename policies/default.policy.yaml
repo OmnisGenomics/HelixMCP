@@ -10,6 +10,7 @@ tool_allowlist:
   - artifact_preview_text
   - simulate_qc_fastq
   - simulate_align_reads
+  - seqkit_stats
   - export_nextflow
 
 quotas:
@@ -32,3 +33,8 @@ tools:
     max_threads: 16
   simulate_qc_fastq:
     max_threads: 8
+
+docker:
+  network_mode: "none"
+  image_allowlist:
+    - "quay.io/biocontainers/seqkit@sha256:67c9a1cfeafbccfd43bbd1fbb80646c9faa06a50b22c8ea758c3c84268b6765d"

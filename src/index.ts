@@ -22,6 +22,7 @@ async function createPool(): Promise<pg.Pool> {
 async function main(): Promise<void> {
   const policyPath = process.env.GATEWAY_POLICY_PATH ?? "policies/default.policy.yaml";
   const objectStoreDir = process.env.OBJECT_STORE_DIR ?? "var/objects";
+  const runsDir = process.env.RUNS_DIR ?? "var/runs";
   const autoSchema = (process.env.AUTO_SCHEMA ?? "true").toLowerCase() !== "false";
 
   const policy = await PolicyEngine.loadFromFile(policyPath);
@@ -34,7 +35,7 @@ async function main(): Promise<void> {
   const store = new PostgresStore(db);
   const objects = new LocalObjectStore(objectStoreDir);
   const artifacts = new ArtifactService(store, objects);
-  const execution = new DefaultExecutionService(policy);
+  const execution = new DefaultExecutionService({ policy, objects, workspaceRootDir: runsDir });
 
   const server = createGatewayServer({ policy, store, artifacts, execution });
   const transport = new StdioServerTransport();

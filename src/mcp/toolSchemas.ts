@@ -134,6 +134,28 @@ export const zSimulateAlignReadsOutput = zProvenance.extend({
   log_artifact_id: zArtifactId
 });
 
+export const zSeqkitStatsInput = z.object({
+  project_id: zProjectId,
+  input_artifact_id: zArtifactId,
+  threads: z.number().int().min(1).max(64).default(2)
+});
+
+export const zSeqkitStatsOutput = zProvenance.extend({
+  report_artifact_id: zArtifactId,
+  stats: z.object({
+    file: z.string().nullable(),
+    format: z.string().nullable(),
+    type: z.string().nullable(),
+    num_seqs: z.number().nullable(),
+    sum_len: z.number().nullable(),
+    min_len: z.number().nullable(),
+    avg_len: z.number().nullable(),
+    max_len: z.number().nullable(),
+    raw: z.record(z.string(), z.string())
+  }),
+  log_artifact_id: zArtifactId
+});
+
 export const zExportNextflowInput = z.object({
   run_id: zRunId
 });
