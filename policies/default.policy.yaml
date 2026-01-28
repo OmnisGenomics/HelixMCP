@@ -11,6 +11,7 @@ tool_allowlist:
   - simulate_qc_fastq
   - simulate_align_reads
   - seqkit_stats
+  - samtools_flagstat
   - export_nextflow
 
 quotas:
@@ -38,3 +39,4 @@ docker:
   network_mode: "none"
   image_allowlist:
     - "quay.io/biocontainers/seqkit@sha256:67c9a1cfeafbccfd43bbd1fbb80646c9faa06a50b22c8ea758c3c84268b6765d"
+    - "quay.io/biocontainers/samtools@sha256:bf80e07e650becfd084db1abde0fe932b50f990a07fa56421ea647b552b5a406"

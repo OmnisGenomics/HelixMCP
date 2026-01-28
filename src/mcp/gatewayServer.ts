@@ -26,6 +26,8 @@ import {
   zExportNextflowOutput,
   zSeqkitStatsInput,
   zSeqkitStatsOutput,
+  zSamtoolsFlagstatInput,
+  zSamtoolsFlagstatOutput,
   zSimulateAlignReadsInput,
   zSimulateAlignReadsOutput,
   zSimulateQcFastqInput,
@@ -70,6 +72,8 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
 
   const SEQKIT_IMAGE =
     "quay.io/biocontainers/seqkit@sha256:67c9a1cfeafbccfd43bbd1fbb80646c9faa06a50b22c8ea758c3c84268b6765d";
+  const SAMTOOLS_IMAGE =
+    "quay.io/biocontainers/samtools@sha256:bf80e07e650becfd084db1abde0fe932b50f990a07fa56421ea647b552b5a406";
 
   mcp.registerTool(
     "artifact_import",
@@ -862,6 +866,145 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
 
         return {
           content: [{ type: "text", text: `seqkit stats complete (run ${structured.provenance_run_id as string})` }],
+          structuredContent: structured
+        };
+      } catch (e) {
+        if (e instanceof McpError) {
+          if (toolRun && started) {
+            if (e.code === ErrorCode.InvalidRequest) await toolRun.finishBlocked(e.message);
+            else await toolRun.finishFailure(e.message);
+          }
+          throw e;
+        }
+        if (e instanceof Error) {
+          if (toolRun && started) await toolRun.finishFailure(e.message);
+          throw e;
+        }
+        if (toolRun && started) await toolRun.finishFailure("unknown error");
+        throw new Error("unknown error");
+      }
+    }
+  );
+
+  mcp.registerTool(
+    "samtools_flagstat",
+    {
+      description: "Run samtools flagstat in Docker on a BAM artifact (deterministic, policy-gated).",
+      inputSchema: zSamtoolsFlagstatInput,
+      outputSchema: zSamtoolsFlagstatOutput
+    },
+    async (args, extra) => {
+      const toolName = "samtools_flagstat";
+      const contractVersion = "v1";
+      const projectId = args.project_id as ProjectId;
+      let toolRun: ToolRun | null = null;
+      let started = false;
+
+      try {
+        deps.policy.assertToolAllowed(toolName);
+        const threads = deps.policy.enforceThreads(toolName, 1);
+
+        const bam = await deps.artifacts.getArtifact(args.bam_artifact_id as ArtifactId);
+        if (!bam) {
+          throw new McpError(ErrorCode.InvalidParams, `unknown bam_artifact_id: ${args.bam_artifact_id}`);
+        }
+        if (bam.type !== "BAM") {
+          throw new McpError(ErrorCode.InvalidParams, `bam_artifact_id must be type BAM (got ${bam.type})`);
+        }
+
+        const canonicalParams: JsonObject = {
+          project_id: projectId,
+          bam: {
+            checksum_sha256: bam.checksumSha256,
+            type: bam.type,
+            size_bytes: bam.sizeBytes.toString()
+          },
+          threads,
+          docker: {
+            image: SAMTOOLS_IMAGE,
+            network_mode: deps.policy.dockerNetworkMode(),
+            argv: ["samtools", "flagstat", "/work/in/input.bam"]
+          }
+        };
+
+        const { runId, paramsHash } = deriveRunId({
+          toolName,
+          contractVersion,
+          policyHash: deps.policy.policyHash,
+          canonicalParams
+        });
+
+        const existing = await deps.store.getRun(runId);
+        if (existing?.status === "succeeded" && existing.resultJson) {
+          return {
+            content: [{ type: "text", text: `Replayed ${toolName} (${runId})` }],
+            structuredContent: existing.resultJson
+          };
+        }
+
+        toolRun = new ToolRun(
+          { store: deps.store, artifacts: deps.artifacts },
+          {
+            runId,
+            projectId,
+            toolName,
+            contractVersion,
+            toolVersion: SAMTOOLS_IMAGE,
+            paramsHash,
+            canonicalParams,
+            policyHash: deps.policy.policyHash,
+            requestedBy: requestedByFromExtra(extra),
+            policySnapshot: deps.policy.snapshot() as JsonObject,
+            environment: envSnapshot()
+          }
+        );
+
+        await toolRun.start();
+        started = true;
+        await toolRun.linkInput(bam.artifactId, "bam");
+        await toolRun.event("exec.plan", `backend=docker image=${SAMTOOLS_IMAGE}`, null);
+
+        const outcome = await deps.execution.execute({
+          runId,
+          toolName,
+          resources: { threads, runtimeSeconds: deps.policy.maxRuntimeSeconds() },
+          canonicalParams,
+          inputs: {
+            bam
+          }
+        });
+
+        if (outcome.exec) {
+          await toolRun.event("exec.result", `exit=${outcome.exec.exitCode}`, {
+            backend: outcome.exec.backend,
+            started_at: outcome.exec.startedAt,
+            finished_at: outcome.exec.finishedAt,
+            stderr: outcome.exec.stderr
+          });
+        }
+
+        const outputIds: Record<string, ArtifactId> = {};
+        for (const out of outcome.outputs) {
+          const id = await toolRun.createOutputArtifact({
+            type: out.type,
+            label: out.label,
+            contentText: out.contentText,
+            role: out.role
+          });
+          outputIds[out.role] = id;
+        }
+
+        const reportArtifactId = outputIds["report"];
+        if (!reportArtifactId) throw new Error("missing report output");
+
+        const flagstat = (outcome.metrics as any).flagstat as unknown;
+        const structured = await toolRun.finishSuccess(
+          { report_artifact_id: reportArtifactId, flagstat: flagstat as JsonObject },
+          "samtools flagstat ok"
+        );
+
+        return {
+          content: [{ type: "text", text: `samtools flagstat complete (run ${structured.provenance_run_id as string})` }],
           structuredContent: structured
         };
       } catch (e) {

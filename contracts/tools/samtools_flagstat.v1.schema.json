@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:samtools_flagstat:v1",
+  "title": "samtools_flagstat input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project_id", "bam_artifact_id"],
+  "properties": {
+    "project_id": { "$ref": "helixmcp:common#/$defs/ProjectId" },
+    "bam_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" }
+  }
+}
+

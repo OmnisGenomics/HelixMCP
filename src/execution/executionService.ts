@@ -147,6 +147,57 @@ export class DefaultExecutionService implements ExecutionService {
       };
     }
 
+    if (job.toolName === "samtools_flagstat") {
+      const bam = job.inputs["bam"];
+      if (!bam) throw new Error("missing bam");
+
+      const image = String((job.canonicalParams as any)?.docker?.image ?? "");
+      this.deps.policy.assertDockerImageAllowed(image);
+
+      const ws = await createRunWorkspace(this.deps.workspaceRootDir, job.runId);
+      const bamPath = ws.inPath("input.bam");
+      await this.deps.objects.materializeToPath(bam.artifactId, bamPath);
+
+      const uid = typeof (process as any).getuid === "function" ? (process as any).getuid() : null;
+      const gid = typeof (process as any).getgid === "function" ? (process as any).getgid() : null;
+      const user = uid !== null && gid !== null ? `${uid}:${gid}` : undefined;
+
+      const dockerSpec: Parameters<RunnerBackend<"docker">["execute"]>[0] = {
+        kind: "docker",
+        image,
+        argv: ["samtools", "flagstat", "/work/in/input.bam"],
+        workdir: "/work",
+        network: this.deps.policy.dockerNetworkMode(),
+        readOnlyRootFs: true,
+        containerName: `helixmcp_${job.runId}`,
+        mounts: [{ hostPath: ws.rootDir, containerPath: "/work", readOnly: false }]
+      };
+      if (user) dockerSpec.user = user;
+
+      const result = await this.docker.execute(dockerSpec, { threads, runtimeSeconds: job.resources.runtimeSeconds });
+      if (result.exitCode !== 0) {
+        throw new Error(`samtools flagstat failed (exit ${result.exitCode})`);
+      }
+
+      const outPath = ws.outPath("samtools_flagstat.txt");
+      await fs.writeFile(outPath, result.stdout, "utf8");
+
+      const { metrics, rawLines, rawText } = parseSamtoolsFlagstat(result.stdout);
+
+      return {
+        outputs: [
+          {
+            role: "report",
+            type: "TEXT",
+            label: "samtools_flagstat.txt",
+            contentText: rawText
+          }
+        ],
+        metrics: { flagstat: { ...metrics, raw_lines: rawLines } },
+        exec: { backend: "docker", ...result }
+      };
+    }
+
     throw new Error(`unsupported tool for execution: ${job.toolName}`);
   }
 }
@@ -190,4 +241,90 @@ function parseSeqkitStatsTsv(tsv: string): { metrics: JsonObject; raw: string } 
   };
 
   return { metrics, raw: lines.join("\n") + "\n" };
+}
+
+type FlagstatCount = { passed: number; failed: number };
+
+function parseSamtoolsFlagstat(stdout: string): {
+  metrics: {
+    total: FlagstatCount | null;
+    secondary: FlagstatCount | null;
+    supplementary: FlagstatCount | null;
+    duplicates: FlagstatCount | null;
+    mapped: FlagstatCount | null;
+    paired_in_sequencing: FlagstatCount | null;
+    read1: FlagstatCount | null;
+    read2: FlagstatCount | null;
+    properly_paired: FlagstatCount | null;
+    with_itself_and_mate_mapped: FlagstatCount | null;
+    singletons: FlagstatCount | null;
+    with_mate_mapped_to_different_chr: FlagstatCount | null;
+    with_mate_mapped_to_different_chr_mapq5: FlagstatCount | null;
+  };
+  rawLines: string[];
+  rawText: string;
+} {
+  const rawLines = stdout
+    .split(/\r?\n/)
+    .map((l) => l.trimEnd())
+    .filter((l) => l.length > 0);
+
+  const empty: {
+    total: FlagstatCount | null;
+    secondary: FlagstatCount | null;
+    supplementary: FlagstatCount | null;
+    duplicates: FlagstatCount | null;
+    mapped: FlagstatCount | null;
+    paired_in_sequencing: FlagstatCount | null;
+    read1: FlagstatCount | null;
+    read2: FlagstatCount | null;
+    properly_paired: FlagstatCount | null;
+    with_itself_and_mate_mapped: FlagstatCount | null;
+    singletons: FlagstatCount | null;
+    with_mate_mapped_to_different_chr: FlagstatCount | null;
+    with_mate_mapped_to_different_chr_mapq5: FlagstatCount | null;
+  } = {
+    total: null,
+    secondary: null,
+    supplementary: null,
+    duplicates: null,
+    mapped: null,
+    paired_in_sequencing: null,
+    read1: null,
+    read2: null,
+    properly_paired: null,
+    with_itself_and_mate_mapped: null,
+    singletons: null,
+    with_mate_mapped_to_different_chr: null,
+    with_mate_mapped_to_different_chr_mapq5: null
+  };
+
+  const parseCounts = (line: string): FlagstatCount | null => {
+    const m = /^(\d+)\s+\+\s+(\d+)\s+/.exec(line);
+    if (!m) return null;
+    return { passed: Number(m[1]), failed: Number(m[2]) };
+  };
+
+  const out: typeof empty = { ...empty };
+
+  for (const line of rawLines) {
+    const counts = parseCounts(line);
+    if (!counts) continue;
+
+    if (line.includes(" in total")) out.total = counts;
+    else if (/\ssecondary\b/.test(line)) out.secondary = counts;
+    else if (/\ssupplementary\b/.test(line)) out.supplementary = counts;
+    else if (/\sduplicates\b/.test(line)) out.duplicates = counts;
+    else if (/\smapped\b/.test(line) && !line.includes("mate mapped")) out.mapped = counts;
+    else if (line.includes(" paired in sequencing")) out.paired_in_sequencing = counts;
+    else if (/\sread1\b/.test(line)) out.read1 = counts;
+    else if (/\sread2\b/.test(line)) out.read2 = counts;
+    else if (line.includes(" properly paired")) out.properly_paired = counts;
+    else if (line.includes(" with itself and mate mapped")) out.with_itself_and_mate_mapped = counts;
+    else if (line.includes(" singletons")) out.singletons = counts;
+    else if (line.includes(" with mate mapped to a different chr (mapQ>=5)")) out.with_mate_mapped_to_different_chr_mapq5 = counts;
+    else if (line.includes(" with mate mapped to a different chr")) out.with_mate_mapped_to_different_chr = counts;
+  }
+
+  return { metrics: out, rawLines, rawText: rawLines.join("\n") + "\n" };
 }

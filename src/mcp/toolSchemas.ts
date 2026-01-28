@@ -156,6 +156,37 @@ export const zSeqkitStatsOutput = zProvenance.extend({
   log_artifact_id: zArtifactId
 });
 
+export const zSamtoolsFlagstatInput = z.object({
+  project_id: zProjectId,
+  bam_artifact_id: zArtifactId
+});
+
+const zFlagstatCount = z.object({
+  passed: z.number(),
+  failed: z.number()
+});
+
+export const zSamtoolsFlagstatOutput = zProvenance.extend({
+  report_artifact_id: zArtifactId,
+  flagstat: z.object({
+    total: zFlagstatCount.nullable(),
+    secondary: zFlagstatCount.nullable(),
+    supplementary: zFlagstatCount.nullable(),
+    duplicates: zFlagstatCount.nullable(),
+    mapped: zFlagstatCount.nullable(),
+    paired_in_sequencing: zFlagstatCount.nullable(),
+    read1: zFlagstatCount.nullable(),
+    read2: zFlagstatCount.nullable(),
+    properly_paired: zFlagstatCount.nullable(),
+    with_itself_and_mate_mapped: zFlagstatCount.nullable(),
+    singletons: zFlagstatCount.nullable(),
+    with_mate_mapped_to_different_chr: zFlagstatCount.nullable(),
+    with_mate_mapped_to_different_chr_mapq5: zFlagstatCount.nullable(),
+    raw_lines: z.array(z.string())
+  }),
+  log_artifact_id: zArtifactId
+});
+
 export const zExportNextflowInput = z.object({
   run_id: zRunId
 });

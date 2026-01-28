@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { mkdtemp, rm } from "fs/promises";
+import { mkdtemp, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
 import { execSync } from "child_process";
@@ -33,7 +33,10 @@ const DOCKER_AVAILABLE =
     }
   })();
 
-describe("gateway (in-memory)", () => {
+const SAMTOOLS_IMAGE =
+  "quay.io/biocontainers/samtools@sha256:bf80e07e650becfd084db1abde0fe932b50f990a07fa56421ea647b552b5a406";
+
+describe.sequential("gateway (in-memory)", () => {
   let tmpDir: string;
   let pool: pg.Pool;
   let store: PostgresStore;
@@ -303,6 +306,106 @@ describe("gateway (in-memory)", () => {
       const count2 = Number((await pool.query("SELECT COUNT(*) AS c FROM param_sets")).rows[0]?.c);
 
       expect((stats2.content[0] as any).text).toContain("Replayed");
+      expect(sc2).toEqual(sc1);
+      expect(count2).toBe(count1);
+    },
+    90_000
+  );
+
+  it.runIf(DOCKER_AVAILABLE)(
+    "runs samtools flagstat via docker and replays",
+    async () => {
+      const projectId = newProjectId();
+
+      const samPath = path.join(tmpDir, "input.sam");
+      const bamPath = path.join(tmpDir, "input.bam");
+
+      const sam = [
+        "@HD\tVN:1.6\tSO:unsorted",
+        "@SQ\tSN:chr1\tLN:1000",
+        "r1\t0\tchr1\t1\t60\t4M\t*\t0\t0\tACGT\t!!!!"
+      ].join("\n");
+
+      await writeFile(samPath, sam + "\n", "utf8");
+
+      const bamBytes = execSync(
+        `docker run --rm --network none -v ${tmpDir}:/work -w /work ${SAMTOOLS_IMAGE} samtools view -bS /work/input.sam`,
+        { stdio: ["ignore", "pipe", "pipe"] }
+      );
+      await writeFile(bamPath, bamBytes);
+
+      const imported = await client.request(
+        {
+          method: "tools/call",
+          params: {
+            name: "artifact_import",
+            arguments: {
+              project_id: projectId,
+              type_hint: "BAM",
+              label: "input.bam",
+              source: { kind: "local_path", path: bamPath }
+            }
+          }
+        },
+        CallToolResultSchema
+      );
+      if (imported.isError) {
+        throw new Error(
+          `artifact_import failed: ${imported.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+        );
+      }
+      const bamId = (imported.structuredContent as any).artifact.artifact_id as string;
+
+      const flag1 = await client.request(
+        {
+          method: "tools/call",
+          params: { name: "samtools_flagstat", arguments: { project_id: projectId, bam_artifact_id: bamId } }
+        },
+        CallToolResultSchema
+      );
+      if (flag1.isError) {
+        throw new Error(
+          `samtools_flagstat failed: ${flag1.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+        );
+      }
+
+      const sc1 = flag1.structuredContent as any;
+      expect(sc1.provenance_run_id).toMatch(/^run_/);
+      expect(sc1.report_artifact_id).toMatch(/^art_/);
+      expect(sc1.flagstat.total.passed).toBe(1);
+      expect(sc1.flagstat.mapped.passed).toBe(1);
+
+      const report = await client.request(
+        { method: "tools/call", params: { name: "artifact_get", arguments: { artifact_id: sc1.report_artifact_id } } },
+        CallToolResultSchema
+      );
+      if (report.isError) {
+        throw new Error(
+          `artifact_get failed: ${report.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+        );
+      }
+      const reportSc = report.structuredContent as any;
+      expect(reportSc.artifact.type).toBe("TEXT");
+      expect(reportSc.artifact.created_by_run_id).toBe(sc1.provenance_run_id);
+
+      const count1 = Number((await pool.query("SELECT COUNT(*) AS c FROM param_sets")).rows[0]?.c);
+
+      const flag2 = await client.request(
+        {
+          method: "tools/call",
+          params: { name: "samtools_flagstat", arguments: { project_id: projectId, bam_artifact_id: bamId } }
+        },
+        CallToolResultSchema
+      );
+      if (flag2.isError) {
+        throw new Error(
+          `samtools_flagstat failed: ${flag2.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+        );
+      }
+      const sc2 = flag2.structuredContent as any;
+      const count2 = Number((await pool.query("SELECT COUNT(*) AS c FROM param_sets")).rows[0]?.c);
+
+      expect((flag2.content[0] as any).text).toContain("Replayed");
       expect(sc2).toEqual(sc1);
       expect(count2).toBe(count1);
     },
