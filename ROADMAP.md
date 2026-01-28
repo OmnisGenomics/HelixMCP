@@ -2,9 +2,9 @@
 
 HelixMCP is an execution + provenance gateway. The goal is to keep execution **boringly correct**: deterministic, inspectable, and policy-gated.
 
-## v0.3 (next): one more real tool
+## v0.3: second real tool
 
-Add exactly one more Docker-backed tool, implemented the same way as `seqkit_stats`:
+Add a second Docker-backed tool, implemented the same way as `seqkit_stats`:
 
 - pinned image digest (policy allowlist)
 - network default `none`
@@ -12,10 +12,9 @@ Add exactly one more Docker-backed tool, implemented the same way as `seqkit_sta
 - outputs captured as artifacts + parsed metrics
 - replay test asserts deterministic behavior and `param_sets` dedupe
 
-Candidate tool (pick one, do it well):
+Delivered in v0.3:
 
-- `samtools_flagstat` (BAM → metrics + report artifact), or
-- `fastqc` (FASTQ → HTML + metrics + report artifacts)
+- `samtools_flagstat` (BAM → metrics + report artifact)
 
 ## v0.4: Slurm runner (policy-gated)
 
@@ -41,4 +40,3 @@ Keep tools as explicit TypeScript modules (not YAML magic) until patterns are pr
 - No default network access for tools
 - No ad-hoc shell command execution via tool parameters
 - No schema drift between “published contracts” and runtime validation
-

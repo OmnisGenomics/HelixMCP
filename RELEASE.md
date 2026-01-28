@@ -1,3 +1,13 @@
+# HelixMCP v0.3.0
+
+This release adds a second real, policy-gated Docker tool and reinforces the “contract-first execution” pattern.
+
+What is included:
+- Second real tool execution via Docker: `samtools_flagstat` (pinned image digest)
+- BAM → report artifact + parsed structured metrics
+- Deterministic replay still holds for the Docker execution path
+- Docker integration test included (gated behind `HELIXMCP_TEST_DOCKER=1`)
+
 # HelixMCP v0.2.0
 
 This release crosses the line from “trust layer only” to “trust layer + real execution”.

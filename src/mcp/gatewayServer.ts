@@ -67,7 +67,7 @@ function envSnapshot(): JsonObject {
 export function createGatewayServer(deps: GatewayDeps): McpServer {
   const mcp = new McpServer({
     name: "helixmcp-biomcp-fabric-gateway",
-    version: "0.2.0"
+    version: "0.3.0"
   });
 
   const SEQKIT_IMAGE =
