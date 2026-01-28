@@ -28,6 +28,14 @@ npm test
 npm run dev
 ```
 
+## Docker-backed tests (opt-in)
+
+Docker integration tests are gated behind an explicit opt-in to keep CI and local dev deterministic:
+
+```bash
+HELIXMCP_TEST_DOCKER=1 npm test
+```
+
 ## Local imports (in silico boundary)
 
 `artifact_import` with `source.kind=local_path` is only permitted under allowlisted prefixes. The default policy allows:

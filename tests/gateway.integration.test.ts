@@ -21,14 +21,17 @@ import { createGatewayServer } from "../src/mcp/gatewayServer.js";
 import { newProjectId } from "../src/core/ids.js";
 import { DefaultExecutionService } from "../src/execution/executionService.js";
 
-const DOCKER_AVAILABLE = (() => {
-  try {
-    execSync("docker version", { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
-  }
-})();
+const DOCKER_ENABLED = process.env.HELIXMCP_TEST_DOCKER === "1";
+const DOCKER_AVAILABLE =
+  DOCKER_ENABLED &&
+  (() => {
+    try {
+      execSync("docker version", { stdio: "ignore" });
+      return true;
+    } catch {
+      return false;
+    }
+  })();
 
 describe("gateway (in-memory)", () => {
   let tmpDir: string;
