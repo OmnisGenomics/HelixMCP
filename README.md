@@ -17,6 +17,13 @@ npm install
 npm run dev
 ```
 
+## Tests
+
+```bash
+npm test
+HELIXMCP_TEST_DOCKER=1 npm test
+```
+
 ### Configuration
 
 - `DATABASE_URL` (optional): if unset, gateway uses in-memory Postgres (`pg-mem`) for dev.
