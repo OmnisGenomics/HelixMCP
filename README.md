@@ -37,6 +37,7 @@ HELIXMCP_TEST_DOCKER=1 npm test
 
 - Stand up Postgres + object store (see `instructions.md`)
 - Implement real executors (Slurm/K8s adapters) behind the policy boundary
+- For Slurm smoke test see `docs/slurm_cluster_smoke.md`
 
 ## License
 
