@@ -72,4 +72,8 @@ export class ArtifactService {
   async previewText(artifactId: ArtifactId, opts: { maxBytes: number; maxLines: number }): Promise<{ preview: string; truncated: boolean }> {
     return this.objects.readTextPreview(artifactId, opts);
   }
+
+  async materializeToPath(artifactId: ArtifactId, destPath: string): Promise<void> {
+    await this.objects.materializeToPath(artifactId, destPath);
+  }
 }

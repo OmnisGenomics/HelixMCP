@@ -37,7 +37,7 @@ async function main(): Promise<void> {
   const artifacts = new ArtifactService(store, objects);
   const execution = new DefaultExecutionService({ policy, objects, workspaceRootDir: runsDir });
 
-  const server = createGatewayServer({ policy, store, artifacts, execution });
+  const server = createGatewayServer({ policy, store, artifacts, execution, runsDir });
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("helixmcp gateway ready");

@@ -23,6 +23,21 @@ export interface PolicyConfig {
     network_mode?: "none" | "bridge";
     image_allowlist: string[];
   };
+  slurm?: {
+    partitions_allowlist: string[];
+    accounts_allowlist: string[];
+    qos_allowlist?: string[];
+    constraints_allowlist?: string[];
+    max_time_limit_seconds: number;
+    max_cpus: number;
+    max_mem_mb: number;
+    max_gpus: number;
+    gpu_types_allowlist?: string[];
+    apptainer: {
+      image_allowlist: string[];
+    };
+    network_mode_required: "none";
+  };
   tools?: Record<string, { max_threads?: number }>;
 }
 
@@ -112,6 +127,104 @@ export class PolicyEngine {
     }
     if (!allowlist.includes(image)) {
       throw new McpError(ErrorCode.InvalidRequest, `policy denied docker image: ${image}`);
+    }
+  }
+
+  private requireSlurm(): NonNullable<PolicyConfig["slurm"]> {
+    if (!this.policy.slurm) {
+      throw new McpError(ErrorCode.InvalidRequest, `policy denied slurm (no slurm config)`);
+    }
+    return this.policy.slurm;
+  }
+
+  assertSlurmPartitionAllowed(partition: string): void {
+    const slurm = this.requireSlurm();
+    if (!slurm.partitions_allowlist.includes(partition)) {
+      throw new McpError(ErrorCode.InvalidRequest, `policy denied slurm partition: ${partition}`);
+    }
+  }
+
+  assertSlurmAccountAllowed(account: string): void {
+    const slurm = this.requireSlurm();
+    if (!slurm.accounts_allowlist.includes(account)) {
+      throw new McpError(ErrorCode.InvalidRequest, `policy denied slurm account: ${account}`);
+    }
+  }
+
+  assertSlurmQosAllowed(qos: string | null | undefined): void {
+    if (qos === null || qos === undefined) return;
+    const slurm = this.requireSlurm();
+    const allowlist = slurm.qos_allowlist ?? [];
+    if (!allowlist.includes(qos)) {
+      throw new McpError(ErrorCode.InvalidRequest, `policy denied slurm qos: ${qos}`);
+    }
+  }
+
+  assertSlurmConstraintAllowed(constraint: string | null | undefined): void {
+    if (constraint === null || constraint === undefined) return;
+    const slurm = this.requireSlurm();
+    const allowlist = slurm.constraints_allowlist ?? [];
+    if (!allowlist.includes(constraint)) {
+      throw new McpError(ErrorCode.InvalidRequest, `policy denied slurm constraint: ${constraint}`);
+    }
+  }
+
+  enforceSlurmResources(input: {
+    timeLimitSeconds: number;
+    cpus: number;
+    memMb: number;
+    gpus: number | null;
+    gpuType: string | null;
+  }): void {
+    const slurm = this.requireSlurm();
+
+    if (input.timeLimitSeconds > slurm.max_time_limit_seconds) {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `policy denied slurm time_limit_seconds=${input.timeLimitSeconds} (max ${slurm.max_time_limit_seconds})`
+      );
+    }
+    if (input.cpus > slurm.max_cpus) {
+      throw new McpError(ErrorCode.InvalidRequest, `policy denied slurm cpus=${input.cpus} (max ${slurm.max_cpus})`);
+    }
+    if (input.memMb > slurm.max_mem_mb) {
+      throw new McpError(ErrorCode.InvalidRequest, `policy denied slurm mem_mb=${input.memMb} (max ${slurm.max_mem_mb})`);
+    }
+
+    if (input.gpus !== null) {
+      if (input.gpus > slurm.max_gpus) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `policy denied slurm gpus=${input.gpus} (max ${slurm.max_gpus})`
+        );
+      }
+      if (input.gpuType !== null) {
+        const allow = slurm.gpu_types_allowlist ?? [];
+        if (!allow.includes(input.gpuType)) {
+          throw new McpError(ErrorCode.InvalidRequest, `policy denied slurm gpu_type: ${input.gpuType}`);
+        }
+      }
+    }
+  }
+
+  assertSlurmApptainerImageAllowed(image: string): void {
+    const slurm = this.requireSlurm();
+    const allowlist = slurm.apptainer.image_allowlist ?? [];
+    if (!allowlist.length) {
+      throw new McpError(ErrorCode.InvalidRequest, `policy denied apptainer image (no allowlist configured): ${image}`);
+    }
+    if (!allowlist.includes(image)) {
+      throw new McpError(ErrorCode.InvalidRequest, `policy denied apptainer image: ${image}`);
+    }
+  }
+
+  assertSlurmNetworkNone(networkMode: string): void {
+    const slurm = this.requireSlurm();
+    if (slurm.network_mode_required !== "none") {
+      throw new McpError(ErrorCode.InvalidRequest, `policy invalid slurm.network_mode_required (must be none)`);
+    }
+    if (networkMode !== "none") {
+      throw new McpError(ErrorCode.InvalidRequest, `policy denied slurm network_mode: ${networkMode}`);
     }
   }
 

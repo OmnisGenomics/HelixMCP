@@ -21,6 +21,8 @@ function safeJoin(baseDir: string, name: string): string {
   return joined;
 }
 
+export { safeJoin };
+
 export async function createRunWorkspace(rootDir: string, runId: RunId): Promise<RunWorkspace> {
   const root = path.resolve(rootDir, runId);
   const inDir = path.join(root, "in");
@@ -41,4 +43,3 @@ export async function createRunWorkspace(rootDir: string, runId: RunId): Promise
     metaPath: (name: string) => safeJoin(metaDir, name)
   };
 }
-

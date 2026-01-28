@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:slurm_submit:out:v1",
+  "title": "slurm_submit output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["provenance_run_id", "slurm_job_id", "slurm_script_artifact_id", "log_artifact_id"],
+  "properties": {
+    "provenance_run_id": { "$ref": "helixmcp:common#/$defs/RunId" },
+    "slurm_job_id": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "slurm_script_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" },
+    "log_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" }
+  }
+}

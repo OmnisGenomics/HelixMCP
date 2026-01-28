@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:slurm_submit:v1",
+  "title": "slurm_submit input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project_id", "job_spec"],
+  "properties": {
+    "project_id": { "$ref": "helixmcp:common#/$defs/ProjectId" },
+    "job_spec": { "$ref": "helixmcp:slurm_job_spec:v1" }
+  }
+}

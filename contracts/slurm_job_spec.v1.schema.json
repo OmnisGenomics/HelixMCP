@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:slurm_job_spec:v1",
+  "title": "SlurmJobSpecV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "resources", "placement", "execution", "io"],
+  "properties": {
+    "version": { "type": "integer", "const": 1 },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["time_limit_seconds", "cpus", "mem_mb"],
+      "properties": {
+        "time_limit_seconds": { "type": "integer", "minimum": 1, "maximum": 604800 },
+        "cpus": { "type": "integer", "minimum": 1, "maximum": 256 },
+        "mem_mb": { "type": "integer", "minimum": 1, "maximum": 2097152 },
+        "gpus": { "type": ["integer", "null"], "minimum": 1, "maximum": 16 },
+        "gpu_type": { "type": ["string", "null"], "minLength": 1, "maxLength": 64 }
+      }
+    },
+    "placement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["partition", "account"],
+      "properties": {
+        "partition": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "account": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "qos": { "type": ["string", "null"], "minLength": 1, "maxLength": 64 },
+        "constraint": { "type": ["string", "null"], "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "container", "command"],
+      "properties": {
+        "kind": { "type": "string", "const": "container" },
+        "container": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["engine", "image", "network_mode"],
+          "properties": {
+            "engine": { "type": "string", "const": "apptainer" },
+            "image": { "type": "string", "minLength": 1, "maxLength": 512 },
+            "network_mode": { "type": "string", "const": "none" },
+            "readonly_rootfs": { "type": "boolean", "const": true }
+          }
+        },
+        "command": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["argv"],
+          "properties": {
+            "argv": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+            "workdir": { "type": "string", "default": "/work" },
+            "env": { "type": "object", "additionalProperties": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "io": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputs", "outputs"],
+      "properties": {
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["role", "artifact_id", "checksum_sha256", "dest_relpath"],
+            "properties": {
+              "role": { "type": "string", "minLength": 1, "maxLength": 64 },
+              "artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" },
+              "checksum_sha256": { "$ref": "helixmcp:common#/$defs/Sha256" },
+              "dest_relpath": { "type": "string", "minLength": 1, "maxLength": 256 }
+            }
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["role", "src_relpath", "type", "label"],
+            "properties": {
+              "role": { "type": "string", "minLength": 1, "maxLength": 64 },
+              "src_relpath": { "type": "string", "minLength": 1, "maxLength": 256 },
+              "type": { "type": "string", "minLength": 1, "maxLength": 32 },
+              "label": { "type": "string", "minLength": 1, "maxLength": 256 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -196,3 +196,74 @@ export const zExportNextflowOutput = zProvenance.extend({
   nextflow_script_artifact_id: zArtifactId,
   log_artifact_id: zArtifactId
 });
+
+export const zSlurmJobSpecV1 = z.object({
+  version: z.literal(1),
+  resources: z.object({
+    time_limit_seconds: z.number().int().min(1).max(604800),
+    cpus: z.number().int().min(1).max(256),
+    mem_mb: z.number().int().min(1).max(2097152),
+    gpus: z.number().int().min(1).max(16).nullable().optional(),
+    gpu_type: z.string().min(1).max(64).nullable().optional()
+  }),
+  placement: z.object({
+    partition: z.string().min(1).max(64),
+    account: z.string().min(1).max(64),
+    qos: z.string().min(1).max(64).nullable().optional(),
+    constraint: z.string().min(1).max(256).nullable().optional()
+  }),
+  execution: z.object({
+    kind: z.literal("container"),
+    container: z.object({
+      engine: z.literal("apptainer"),
+      image: z.string().min(1).max(512),
+      network_mode: z.literal("none"),
+      readonly_rootfs: z.literal(true)
+    }),
+    command: z.object({
+      argv: z.array(z.string().min(1)).min(1),
+      workdir: z.string().min(1).default("/work"),
+      env: z.record(z.string(), z.string())
+    })
+  }),
+  io: z.object({
+    inputs: z.array(
+      z.object({
+        role: z.string().min(1).max(64),
+        artifact_id: zArtifactId,
+        checksum_sha256: zSha256,
+        dest_relpath: z.string().min(1).max(256)
+      })
+    ),
+    outputs: z.array(
+      z.object({
+        role: z.string().min(1).max(64),
+        src_relpath: z.string().min(1).max(256),
+        type: z.string().min(1).max(32),
+        label: z.string().min(1).max(256)
+      })
+    )
+  })
+});
+
+export const zSlurmSubmitInput = z.object({
+  project_id: zProjectId,
+  job_spec: zSlurmJobSpecV1
+});
+
+export const zSlurmSubmitOutput = zProvenance.extend({
+  slurm_job_id: z.string().min(1).max(64),
+  slurm_script_artifact_id: zArtifactId,
+  log_artifact_id: zArtifactId
+});
+
+export const zSlurmJobCollectInput = z.object({
+  run_id: zRunId
+});
+
+export const zSlurmJobCollectOutput = zProvenance.extend({
+  target_run_id: zRunId,
+  exit_code: z.number().int(),
+  artifacts_by_role: z.record(z.string(), zArtifactId),
+  log_artifact_id: zArtifactId
+});

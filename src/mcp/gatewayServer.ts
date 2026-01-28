@@ -1,6 +1,7 @@
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { promises as fs } from "fs";
+import path from "path";
 import type { ArtifactRecord } from "../core/artifact.js";
 import type { ArtifactType } from "../core/artifact.js";
 import type { ArtifactId, ProjectId, RunId } from "../core/ids.js";
@@ -13,6 +14,10 @@ import type { ExecutionService } from "../execution/executionService.js";
 import { ToolRun, requestedByFromExtra } from "../runs/toolRun.js";
 import { deriveRunId } from "../runs/runIdentity.js";
 import { ImportTooLargeError } from "../artifacts/localObjectStore.js";
+import { createRunWorkspace, safeJoin } from "../execution/workspace.js";
+import { renderSlurmScriptV1, type SlurmJobSpecV1 } from "../execution/slurm/slurmScriptV1.js";
+import type { SlurmSubmitter } from "../execution/slurm/submitter.js";
+import { SbatchSubmitter } from "../execution/slurm/submitter.js";
 import {
   zArtifactGetInput,
   zArtifactGetOutput,
@@ -26,6 +31,10 @@ import {
   zExportNextflowOutput,
   zSeqkitStatsInput,
   zSeqkitStatsOutput,
+  zSlurmJobCollectInput,
+  zSlurmJobCollectOutput,
+  zSlurmSubmitInput,
+  zSlurmSubmitOutput,
   zSamtoolsFlagstatInput,
   zSamtoolsFlagstatOutput,
   zSimulateAlignReadsInput,
@@ -39,6 +48,8 @@ export interface GatewayDeps {
   store: PostgresStore;
   artifacts: ArtifactService;
   execution: ExecutionService;
+  runsDir: string;
+  slurmSubmitter?: SlurmSubmitter;
 }
 
 function toArtifactSummary(a: ArtifactRecord): JsonObject {
@@ -60,7 +71,8 @@ function envSnapshot(): JsonObject {
   return {
     node: process.version,
     mode: process.env.DATABASE_URL ? "postgres" : "pg-mem",
-    object_store: process.env.OBJECT_STORE_DIR ?? "var/objects"
+    object_store: process.env.OBJECT_STORE_DIR ?? "var/objects",
+    runs_dir: process.env.RUNS_DIR ?? "var/runs"
   };
 }
 
@@ -74,6 +86,34 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
     "quay.io/biocontainers/seqkit@sha256:67c9a1cfeafbccfd43bbd1fbb80646c9faa06a50b22c8ea758c3c84268b6765d";
   const SAMTOOLS_IMAGE =
     "quay.io/biocontainers/samtools@sha256:bf80e07e650becfd084db1abde0fe932b50f990a07fa56421ea647b552b5a406";
+  const slurmSubmitter = deps.slurmSubmitter ?? new SbatchSubmitter();
+
+  const ARTIFACT_TYPE_SET = new Set<ArtifactType>([
+    "FASTQ_GZ",
+    "BAM",
+    "BAI",
+    "VCF",
+    "H5AD",
+    "TSV",
+    "CSV",
+    "JSON",
+    "TEXT",
+    "HTML",
+    "PDF",
+    "LOG",
+    "UNKNOWN"
+  ]);
+
+  function requireArtifactType(value: string): ArtifactType {
+    if (ARTIFACT_TYPE_SET.has(value as ArtifactType)) return value as ArtifactType;
+    throw new McpError(ErrorCode.InvalidParams, `unknown artifact type: ${value}`);
+  }
+
+  async function assertRegularFileNoSymlink(filePath: string, context: string): Promise<void> {
+    const st = await fs.lstat(filePath);
+    if (st.isSymbolicLink()) throw new McpError(ErrorCode.InvalidRequest, `policy denied symlinked file for ${context}`);
+    if (!st.isFile()) throw new McpError(ErrorCode.InvalidRequest, `expected file for ${context}: ${filePath}`);
+  }
 
   mcp.registerTool(
     "artifact_import",
@@ -1005,6 +1045,413 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
 
         return {
           content: [{ type: "text", text: `samtools flagstat complete (run ${structured.provenance_run_id as string})` }],
+          structuredContent: structured
+        };
+      } catch (e) {
+        if (e instanceof McpError) {
+          if (toolRun && started) {
+            if (e.code === ErrorCode.InvalidRequest) await toolRun.finishBlocked(e.message);
+            else await toolRun.finishFailure(e.message);
+          }
+          throw e;
+        }
+        if (e instanceof Error) {
+          if (toolRun && started) await toolRun.finishFailure(e.message);
+          throw e;
+        }
+        if (toolRun && started) await toolRun.finishFailure("unknown error");
+        throw new Error("unknown error");
+      }
+    }
+  );
+
+  mcp.registerTool(
+    "slurm_submit",
+    {
+      description: "Submit a deterministic, policy-gated Slurm job spec (apptainer-only, network none).",
+      inputSchema: zSlurmSubmitInput,
+      outputSchema: zSlurmSubmitOutput
+    },
+    async (args, extra) => {
+      const toolName = "slurm_submit";
+      const contractVersion = "v1";
+      const projectId = args.project_id as ProjectId;
+      const jobSpec = args.job_spec as unknown as SlurmJobSpecV1;
+      let toolRun: ToolRun | null = null;
+      let started = false;
+
+      try {
+        deps.policy.assertToolAllowed(toolName);
+
+        const env = jobSpec.execution.command.env ?? {};
+        const envSorted: Record<string, string> = {};
+        for (const k of Object.keys(env).sort()) envSorted[k] = String(env[k] ?? "");
+
+        const inputsSorted = [...jobSpec.io.inputs].sort((a, b) =>
+          a.role.localeCompare(b.role) || a.dest_relpath.localeCompare(b.dest_relpath)
+        );
+        const outputsSorted = [...jobSpec.io.outputs].sort((a, b) =>
+          a.role.localeCompare(b.role) || a.src_relpath.localeCompare(b.src_relpath)
+        );
+
+        const canonicalParams: JsonObject = {
+          project_id: projectId,
+          slurm: {
+            spec_version: 1,
+            slurm_script_version: "slurm_script_v1",
+            resources: {
+              time_limit_seconds: jobSpec.resources.time_limit_seconds,
+              cpus: jobSpec.resources.cpus,
+              mem_mb: jobSpec.resources.mem_mb,
+              gpus: jobSpec.resources.gpus ?? null,
+              gpu_type: jobSpec.resources.gpu_type ?? null
+            },
+            placement: {
+              partition: jobSpec.placement.partition,
+              account: jobSpec.placement.account,
+              qos: jobSpec.placement.qos ?? null,
+              constraint: jobSpec.placement.constraint ?? null
+            },
+            execution: {
+              kind: "container",
+              container: {
+                engine: "apptainer",
+                image: jobSpec.execution.container.image,
+                network_mode: "none",
+                readonly_rootfs: true
+              },
+              command: {
+                argv: [...jobSpec.execution.command.argv],
+                workdir: jobSpec.execution.command.workdir ?? "/work",
+                env: envSorted
+              }
+            },
+            io: {
+              inputs: inputsSorted.map((i) => ({
+                role: i.role,
+                artifact_id: i.artifact_id,
+                checksum_sha256: i.checksum_sha256,
+                dest_relpath: i.dest_relpath
+              })),
+              outputs: outputsSorted.map((o) => ({
+                role: o.role,
+                src_relpath: o.src_relpath,
+                type: o.type,
+                label: o.label
+              }))
+            }
+          }
+        };
+
+        const { runId, paramsHash } = deriveRunId({
+          toolName,
+          contractVersion,
+          policyHash: deps.policy.policyHash,
+          canonicalParams
+        });
+
+        const existing = await deps.store.getRun(runId);
+        if (existing?.resultJson) {
+          return {
+            content: [{ type: "text", text: `Replayed ${toolName} (${runId})` }],
+            structuredContent: existing.resultJson
+          };
+        }
+
+        toolRun = new ToolRun(
+          { store: deps.store, artifacts: deps.artifacts },
+          {
+            runId,
+            projectId,
+            toolName,
+            contractVersion,
+            toolVersion: "slurm_script_v1",
+            paramsHash,
+            canonicalParams,
+            policyHash: deps.policy.policyHash,
+            requestedBy: requestedByFromExtra(extra),
+            policySnapshot: deps.policy.snapshot() as JsonObject,
+            environment: envSnapshot()
+          }
+        );
+
+        await toolRun.start();
+        started = true;
+
+        deps.policy.assertSlurmPartitionAllowed(jobSpec.placement.partition);
+        deps.policy.assertSlurmAccountAllowed(jobSpec.placement.account);
+        deps.policy.assertSlurmQosAllowed(jobSpec.placement.qos ?? null);
+        deps.policy.assertSlurmConstraintAllowed(jobSpec.placement.constraint ?? null);
+        deps.policy.enforceSlurmResources({
+          timeLimitSeconds: jobSpec.resources.time_limit_seconds,
+          cpus: jobSpec.resources.cpus,
+          memMb: jobSpec.resources.mem_mb,
+          gpus: jobSpec.resources.gpus ?? null,
+          gpuType: jobSpec.resources.gpu_type ?? null
+        });
+        deps.policy.assertSlurmNetworkNone(jobSpec.execution.container.network_mode);
+        deps.policy.assertSlurmApptainerImageAllowed(jobSpec.execution.container.image);
+
+        await toolRun.event("slurm.submit.plan", `partition=${jobSpec.placement.partition} account=${jobSpec.placement.account}`, {
+          partition: jobSpec.placement.partition,
+          account: jobSpec.placement.account,
+          qos: jobSpec.placement.qos ?? null,
+          constraint: jobSpec.placement.constraint ?? null,
+          resources: jobSpec.resources,
+          image: jobSpec.execution.container.image
+        });
+
+        const ws = await createRunWorkspace(deps.runsDir, runId);
+
+        for (const input of inputsSorted) {
+          const artifactId = input.artifact_id as ArtifactId;
+          const artifact = await deps.artifacts.getArtifact(artifactId);
+          if (!artifact) {
+            throw new McpError(ErrorCode.InvalidParams, `unknown artifact_id in slurm input: ${artifactId}`);
+          }
+          if (artifact.projectId !== projectId) {
+            throw new McpError(ErrorCode.InvalidRequest, `policy denied cross-project artifact: ${artifactId}`);
+          }
+          if (artifact.checksumSha256 !== input.checksum_sha256) {
+            throw new McpError(
+              ErrorCode.InvalidParams,
+              `checksum mismatch for artifact ${artifactId} (expected ${artifact.checksumSha256}, got ${input.checksum_sha256})`
+            );
+          }
+
+          await toolRun.linkInput(artifactId, input.role);
+          const destPath = safeJoin(ws.rootDir, input.dest_relpath);
+          await deps.artifacts.materializeToPath(artifactId, destPath);
+        }
+
+        const script = renderSlurmScriptV1({
+          workspaceRootDir: ws.rootDir,
+          jobName: `helixmcp_${runId}`,
+          spec: jobSpec
+        });
+
+        const scriptPath = ws.metaPath("slurm_script.sbatch");
+        await fs.writeFile(scriptPath, script, "utf8");
+
+        const scriptArtifactId = await toolRun.createOutputArtifact({
+          type: "TEXT",
+          label: "slurm_script.sbatch",
+          contentText: script,
+          role: "slurm_script"
+        });
+
+        await toolRun.event("slurm.submit.script_artifact", `artifact=${scriptArtifactId}`, {
+          slurm_script_artifact_id: scriptArtifactId
+        });
+
+        const submit = await slurmSubmitter.submit(scriptPath);
+        await fs.writeFile(ws.metaPath("slurm_job_id.txt"), submit.slurmJobId + "\n", "utf8");
+
+        await toolRun.event("slurm.submit.ok", `job_id=${submit.slurmJobId}`, { slurm_job_id: submit.slurmJobId });
+
+        const structured = await toolRun.checkpointQueued(
+          { slurm_job_id: submit.slurmJobId, slurm_script_artifact_id: scriptArtifactId },
+          "slurm submitted"
+        );
+
+        return {
+          content: [{ type: "text", text: `slurm submitted (run ${structured.provenance_run_id as string})` }],
+          structuredContent: structured
+        };
+      } catch (e) {
+        if (e instanceof McpError) {
+          if (toolRun && started) {
+            if (e.code === ErrorCode.InvalidRequest) await toolRun.finishBlocked(e.message);
+            else await toolRun.finishFailure(e.message);
+          }
+          throw e;
+        }
+        if (e instanceof Error) {
+          if (toolRun && started) await toolRun.finishFailure(e.message);
+          throw e;
+        }
+        if (toolRun && started) await toolRun.finishFailure("unknown error");
+        throw new Error("unknown error");
+      }
+    }
+  );
+
+  mcp.registerTool(
+    "slurm_job_collect",
+    {
+      description: "Collect outputs for a previously submitted slurm_submit run and finalize its status.",
+      inputSchema: zSlurmJobCollectInput,
+      outputSchema: zSlurmJobCollectOutput
+    },
+    async (args, extra) => {
+      const toolName = "slurm_job_collect";
+      const contractVersion = "v1";
+      const targetRunId = args.run_id as RunId;
+      let toolRun: ToolRun | null = null;
+      let started = false;
+
+      try {
+        deps.policy.assertToolAllowed(toolName);
+
+        const targetRun = await deps.store.getRun(targetRunId);
+        if (!targetRun) throw new McpError(ErrorCode.InvalidParams, `unknown run_id: ${targetRunId}`);
+
+        const canonicalParams: JsonObject = {
+          target_run_id: targetRunId
+        };
+
+        const { runId, paramsHash } = deriveRunId({
+          toolName,
+          contractVersion,
+          policyHash: deps.policy.policyHash,
+          canonicalParams
+        });
+
+        const existing = await deps.store.getRun(runId);
+        if (existing?.status === "succeeded" && existing.resultJson) {
+          return {
+            content: [{ type: "text", text: `Replayed ${toolName} (${runId})` }],
+            structuredContent: existing.resultJson
+          };
+        }
+
+        toolRun = new ToolRun(
+          { store: deps.store, artifacts: deps.artifacts },
+          {
+            runId,
+            projectId: targetRun.projectId,
+            toolName,
+            contractVersion,
+            toolVersion: "v1",
+            paramsHash,
+            canonicalParams,
+            policyHash: deps.policy.policyHash,
+            requestedBy: requestedByFromExtra(extra),
+            policySnapshot: deps.policy.snapshot() as JsonObject,
+            environment: envSnapshot()
+          }
+        );
+
+        await toolRun.start();
+        started = true;
+        await toolRun.event("collect.plan", `target_run_id=${targetRunId}`, null);
+
+        await deps.store.addRunEvent(targetRunId, "slurm.collect.start", "collect started", { collector_run_id: runId });
+
+        const targetParams = await deps.store.getParamSet(targetRun.paramsHash);
+        const slurmOutputs = (((targetParams as any)?.slurm as any)?.io as any)?.outputs;
+        if (!Array.isArray(slurmOutputs)) {
+          throw new McpError(ErrorCode.InvalidRequest, `target run does not look like a slurm_submit run: ${targetRunId}`);
+        }
+
+        const ws = await createRunWorkspace(deps.runsDir, targetRunId);
+        const existingOutputs = await deps.store.listRunOutputs(targetRunId);
+        const byRoleExisting = new Map<string, ArtifactId>();
+        for (const o of existingOutputs) {
+          if (!byRoleExisting.has(o.role)) byRoleExisting.set(o.role, o.artifactId);
+        }
+
+        const artifactsByRole: Record<string, ArtifactId> = {};
+
+        for (const out of slurmOutputs as Array<any>) {
+          const role = String(out.role ?? "");
+          const srcRel = String(out.src_relpath ?? "");
+          const typeStr = String(out.type ?? "");
+          const label = String(out.label ?? "");
+          if (!role || !srcRel || !typeStr || !label) {
+            throw new McpError(ErrorCode.InvalidRequest, `invalid slurm output spec in target canonical params`);
+          }
+
+          const already = byRoleExisting.get(role);
+          if (already) {
+            artifactsByRole[role] = already;
+            continue;
+          }
+
+          const type = requireArtifactType(typeStr);
+          const srcPath = safeJoin(ws.rootDir, srcRel);
+          await assertRegularFileNoSymlink(srcPath, `output role=${role}`);
+
+          const artifact = await deps.artifacts.importArtifact({
+            projectId: targetRun.projectId,
+            source: { kind: "local_path", path: srcPath },
+            typeHint: type,
+            label,
+            createdByRunId: targetRunId,
+            maxBytes: null
+          });
+
+          await deps.store.addRunOutput(targetRunId, artifact.artifactId, role);
+          byRoleExisting.set(role, artifact.artifactId);
+          artifactsByRole[role] = artifact.artifactId;
+        }
+
+        const stdoutPath = safeJoin(ws.rootDir, path.join("meta", "stdout.txt"));
+        const stderrPath = safeJoin(ws.rootDir, path.join("meta", "stderr.txt"));
+
+        for (const [role, p] of [
+          ["stdout", stdoutPath],
+          ["stderr", stderrPath]
+        ] as const) {
+          if (byRoleExisting.has(role)) {
+            artifactsByRole[role] = byRoleExisting.get(role)!;
+            continue;
+          }
+          try {
+            await assertRegularFileNoSymlink(p, role);
+          } catch {
+            continue;
+          }
+
+          const artifact = await deps.artifacts.importArtifact({
+            projectId: targetRun.projectId,
+            source: { kind: "local_path", path: p },
+            typeHint: "LOG",
+            label: `${role}.txt`,
+            createdByRunId: targetRunId,
+            maxBytes: null
+          });
+          await deps.store.addRunOutput(targetRunId, artifact.artifactId, role);
+          byRoleExisting.set(role, artifact.artifactId);
+          artifactsByRole[role] = artifact.artifactId;
+        }
+
+        const exitCodePath = safeJoin(ws.rootDir, path.join("meta", "exit_code.txt"));
+        await assertRegularFileNoSymlink(exitCodePath, "exit_code");
+        const exitCodeRaw = (await fs.readFile(exitCodePath, "utf8")).trim();
+        const exitCode = Number.parseInt(exitCodeRaw, 10);
+        if (!Number.isInteger(exitCode)) {
+          throw new McpError(ErrorCode.InvalidRequest, `invalid exit_code.txt content: ${exitCodeRaw}`);
+        }
+
+        const finishedAt = new Date().toISOString();
+        const status = exitCode === 0 ? "succeeded" : "failed";
+        const error = exitCode === 0 ? null : `slurm job exit_code=${exitCode}`;
+
+        await deps.store.updateRun(targetRunId, {
+          status,
+          finishedAt,
+          exitCode,
+          error
+        });
+
+        await deps.store.addRunEvent(targetRunId, "slurm.collect.outputs_registered", "outputs registered", {
+          artifacts_by_role: artifactsByRole
+        });
+        await deps.store.addRunEvent(
+          targetRunId,
+          status === "succeeded" ? "slurm.collect.done" : "slurm.collect.failed",
+          status === "succeeded" ? "collect done" : "collect failed",
+          { exit_code: exitCode }
+        );
+
+        const structured = await toolRun.finishSuccess(
+          { target_run_id: targetRunId, exit_code: exitCode, artifacts_by_role: artifactsByRole },
+          "slurm collect ok"
+        );
+
+        return {
+          content: [{ type: "text", text: `slurm collected (target ${targetRunId})` }],
           structuredContent: structured
         };
       } catch (e) {

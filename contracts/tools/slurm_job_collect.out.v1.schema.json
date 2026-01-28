@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:slurm_job_collect:out:v1",
+  "title": "slurm_job_collect output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["provenance_run_id", "target_run_id", "exit_code", "artifacts_by_role", "log_artifact_id"],
+  "properties": {
+    "provenance_run_id": { "$ref": "helixmcp:common#/$defs/RunId" },
+    "target_run_id": { "$ref": "helixmcp:common#/$defs/RunId" },
+    "exit_code": { "type": "integer" },
+    "artifacts_by_role": {
+      "type": "object",
+      "additionalProperties": { "$ref": "helixmcp:common#/$defs/ArtifactId" }
+    },
+    "log_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" }
+  }
+}

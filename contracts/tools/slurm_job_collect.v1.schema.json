@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:slurm_job_collect:v1",
+  "title": "slurm_job_collect input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["run_id"],
+  "properties": {
+    "run_id": { "$ref": "helixmcp:common#/$defs/RunId" }
+  }
+}

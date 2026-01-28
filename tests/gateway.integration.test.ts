@@ -58,9 +58,10 @@ describe.sequential("gateway (in-memory)", () => {
     const objects = new LocalObjectStore(path.join(tmpDir, "objects"));
     const artifacts = new ArtifactService(store, objects);
     const policy = await PolicyEngine.loadFromFile(path.resolve("policies/default.policy.yaml"));
-    const execution = new DefaultExecutionService({ policy, objects, workspaceRootDir: path.join(tmpDir, "runs") });
+    const runsDir = path.join(tmpDir, "runs");
+    const execution = new DefaultExecutionService({ policy, objects, workspaceRootDir: runsDir });
 
-    server = createGatewayServer({ policy, store, artifacts, execution });
+    server = createGatewayServer({ policy, store, artifacts, execution, runsDir });
 
     [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     await server.connect(serverTransport);

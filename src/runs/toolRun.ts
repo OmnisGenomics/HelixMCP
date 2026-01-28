@@ -89,12 +89,42 @@ export class ToolRun {
     return this.finish("succeeded", null, summary, result);
   }
 
+  async checkpointQueued(result: JsonObject, summary: string): Promise<JsonObject> {
+    return this.checkpoint("queued", summary, result);
+  }
+
   async finishBlocked(reason: string): Promise<void> {
     await this.finish("blocked", reason, `blocked: ${reason}`, null);
   }
 
   async finishFailure(errorMessage: string): Promise<void> {
     await this.finish("failed", errorMessage, `failed: ${errorMessage}`, null);
+  }
+
+  private async checkpoint(status: Extract<RunStatus, "queued" | "running">, summary: string, result: JsonObject): Promise<JsonObject> {
+    await this.event(`run.${status}`, summary, null);
+
+    const logArtifactId = await this.createOutputArtifact({
+      type: "LOG",
+      label: `${this.info.toolName}.log`,
+      contentText: this.logLines.join("\n") + "\n",
+      role: "log"
+    });
+
+    const resultWithProvenance: JsonObject = {
+      ...result,
+      provenance_run_id: this.runId,
+      log_artifact_id: logArtifactId
+    };
+
+    await this.deps.store.updateRun(this.runId, {
+      status,
+      error: null,
+      logArtifactId,
+      resultJson: resultWithProvenance
+    });
+
+    return resultWithProvenance;
   }
 
   private async finish(status: RunStatus, error: string | null, finalMessage: string, result: JsonObject | null): Promise<JsonObject> {

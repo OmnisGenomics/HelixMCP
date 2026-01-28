@@ -154,6 +154,15 @@ export class PostgresStore {
       .execute();
   }
 
+  async getParamSet(paramsHash: `sha256:${string}`): Promise<JsonObject | null> {
+    const row = await this.db
+      .selectFrom("param_sets")
+      .select(["canonical_json"])
+      .where("params_hash", "=", paramsHash)
+      .executeTakeFirst();
+    return row ? ((row.canonical_json ?? null) as JsonObject) : null;
+  }
+
   async createRun(input: {
     runId: RunId;
     projectId: ProjectId;
