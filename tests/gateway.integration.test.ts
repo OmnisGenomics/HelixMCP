@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { mkdtemp, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
-import { execSync } from "child_process";
+import { execSync, spawnSync } from "child_process";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -328,10 +328,34 @@ describe.sequential("gateway (in-memory)", () => {
 
       await writeFile(samPath, sam + "\n", "utf8");
 
-      const bamBytes = execSync(
-        `docker run --rm --network none -v ${tmpDir}:/work -w /work ${SAMTOOLS_IMAGE} samtools view -bS /work/input.sam`,
+      const docker = spawnSync(
+        "docker",
+        [
+          "run",
+          "--rm",
+          "--network",
+          "none",
+          "-v",
+          `${tmpDir}:/work`,
+          "-w",
+          "/work",
+          SAMTOOLS_IMAGE,
+          "samtools",
+          "view",
+          "-bS",
+          "/work/input.sam"
+        ],
         { stdio: ["ignore", "pipe", "pipe"] }
       );
+      if (docker.error) throw docker.error;
+      if (docker.status !== 0) {
+        const stderr = docker.stderr ? docker.stderr.toString("utf8") : "";
+        throw new Error(`docker samtools view failed (exit ${docker.status})${stderr ? `: ${stderr}` : ""}`);
+      }
+      if (!docker.stdout || typeof docker.stdout === "string") {
+        throw new Error("docker samtools view produced no BAM bytes");
+      }
+      const bamBytes = docker.stdout;
       await writeFile(bamPath, bamBytes);
 
       const imported = await client.request(
