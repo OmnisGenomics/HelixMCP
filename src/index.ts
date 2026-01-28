@@ -26,6 +26,12 @@ async function main(): Promise<void> {
   const autoSchema = (process.env.AUTO_SCHEMA ?? "true").toLowerCase() !== "false";
 
   const policy = await PolicyEngine.loadFromFile(policyPath);
+  if (process.env.DATABASE_URL) {
+    const instanceId = policy.runtimeInstanceId();
+    if (!instanceId) {
+      throw new Error(`policy runtime.instance_id is required when DATABASE_URL is set (to avoid run_id collisions)`);
+    }
+  }
   const pool = await createPool();
   if (!process.env.DATABASE_URL || autoSchema) {
     await applySqlFile(pool, "db/schema.sql");

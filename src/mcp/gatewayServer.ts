@@ -79,7 +79,7 @@ function envSnapshot(): JsonObject {
 export function createGatewayServer(deps: GatewayDeps): McpServer {
   const mcp = new McpServer({
     name: "helixmcp-biomcp-fabric-gateway",
-    version: "0.3.0"
+    version: "0.4.0"
   });
 
   const SEQKIT_IMAGE =
@@ -1368,6 +1368,9 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
             if (existing) artifactsByRole[role] = existing;
           }
 
+          const slurmScript = byRoleExisting.get("slurm_script");
+          if (slurmScript) artifactsByRole["slurm_script"] = slurmScript;
+
           const structured = await toolRun.finishSuccess(
             { target_run_id: targetRunId, exit_code: targetRun.exitCode, artifacts_by_role: artifactsByRole },
             "slurm collect (idempotent)"
@@ -1455,6 +1458,9 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
           byRoleExisting.set(role, artifact.artifactId);
           artifactsByRole[role] = artifact.artifactId;
         }
+
+        const slurmScript = byRoleExisting.get("slurm_script");
+        if (slurmScript) artifactsByRole["slurm_script"] = slurmScript;
 
         const exitCodePath = safeJoin(ws.rootDir, path.join("meta", "exit_code.txt"));
         await assertRegularFileNoSymlink(exitCodePath, "exit_code");

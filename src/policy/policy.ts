@@ -108,6 +108,13 @@ export class PolicyEngine {
     return JSON.parse(JSON.stringify(this.policy)) as Record<string, unknown>;
   }
 
+  runtimeInstanceId(): string | null {
+    const raw = this.policy.runtime?.instance_id;
+    if (typeof raw !== "string") return null;
+    const trimmed = raw.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
   previewCaps(): { maxBytes: number; maxLines: number } {
     return {
       maxBytes: this.policy.quotas.max_preview_bytes ?? 8192,

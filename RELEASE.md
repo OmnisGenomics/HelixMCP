@@ -1,3 +1,14 @@
+# HelixMCP v0.4.0
+
+This release adds a deterministic Slurm “submit + collect” island (apptainer only, network none) while preserving trust-layer invariants.
+
+What is included:
+- `slurm_submit` tool (hashes a canonicalized `SlurmJobSpecV1` into `run_id`; stores a deterministic `slurm_script_v1` artifact; records Slurm job id as an event)
+- `slurm_job_collect` tool (collects declared outputs into artifacts, enforces size caps, and finalizes the target run idempotently)
+- Slurm policy surface: allowlists for partition/account/qos/constraint and apptainer image digests; hard `network_mode=none`
+- `runtime.instance_id` included in `policyHash` and required when `DATABASE_URL` is set to avoid cross-gateway run collisions
+- Stubbed integration test proving submit → collect → replay without resubmission
+
 # HelixMCP v0.3.0
 
 This release adds a second real, policy-gated Docker tool and reinforces the “contract-first execution” pattern.
