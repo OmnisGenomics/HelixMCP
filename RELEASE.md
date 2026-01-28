@@ -1,3 +1,14 @@
+# HelixMCP v0.2.0
+
+This release crosses the line from “trust layer only” to “trust layer + real execution”.
+
+What is included:
+- First real tool execution via Docker: `seqkit_stats` (pinned image digest)
+- Per-run workspace with input materialization and output capture into artifacts
+- Docker policy hardening: image allowlist + network mode, enforced at execution boundary
+- Deterministic replay still holds for the real execution path
+- Docker integration test included (auto-skips if Docker is unavailable)
+
 # HelixMCP v0.1.0
 
 This release establishes the trust layer for a governed MCP gateway.
