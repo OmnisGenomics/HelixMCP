@@ -23,6 +23,10 @@ import type { SlurmScheduler } from "../src/execution/slurm/scheduler.js";
 
 const APPTAINER_SAMTOOLS_IMAGE =
   "docker://quay.io/biocontainers/samtools@sha256:bf80e07e650becfd084db1abde0fe932b50f990a07fa56421ea647b552b5a406";
+const APPTAINER_FASTQC_IMAGE =
+  "docker://quay.io/biocontainers/fastqc@sha256:e194048df39c3145d9b4e0a14f4da20b59d59250465b6f2a9cb698445fd45900";
+const APPTAINER_MULTIQC_IMAGE =
+  "docker://quay.io/biocontainers/multiqc@sha256:ecafca93ba3346775b773bbfd6ff920ecfc259f554777576c15d3139c678311b";
 
 describe.sequential("slurm (stubbed)", () => {
   let tmpDir: string;
@@ -53,7 +57,16 @@ describe.sequential("slurm (stubbed)", () => {
     const policyConfig: PolicyConfig = {
       version: 1,
       runtime: { instance_id: "test" },
-      tool_allowlist: ["artifact_import", "artifact_get", "slurm_submit", "slurm_job_get", "slurm_job_collect"],
+      tool_allowlist: [
+        "artifact_import",
+        "artifact_get",
+        "slurm_submit",
+        "slurm_job_get",
+        "slurm_job_collect",
+        "fastqc",
+        "multiqc",
+        "qc_bundle_fastq"
+      ],
       quotas: {
         max_threads: 16,
         max_runtime_seconds: 3600,
@@ -84,7 +97,7 @@ describe.sequential("slurm (stubbed)", () => {
         max_collect_log_bytes: 1024 * 1024,
         gpu_types_allowlist: [],
         apptainer: {
-          image_allowlist: [APPTAINER_SAMTOOLS_IMAGE]
+          image_allowlist: [APPTAINER_SAMTOOLS_IMAGE, APPTAINER_FASTQC_IMAGE, APPTAINER_MULTIQC_IMAGE]
         },
         network_mode_required: "none"
       }
@@ -284,5 +297,73 @@ describe.sequential("slurm (stubbed)", () => {
     expect(submitCalls).toBe(1);
     expect((submit2.content[0] as any).text).toContain("Replayed");
     expect(submit2.structuredContent).toEqual(sc1);
+  });
+
+  it("qc_bundle_fastq phase A checkpoints queued without requiring multiqc outputs", async () => {
+    const projectId = newProjectId();
+    const submitBefore = submitCalls;
+
+    const imported = await client.request(
+      {
+        method: "tools/call",
+        params: {
+          name: "artifact_import",
+          arguments: {
+            project_id: projectId,
+            type_hint: "FASTQ_GZ",
+            label: "reads_1.fastq.gz",
+            source: { kind: "inline_text", text: "@r1\nACGT\n+\n!!!!\n" }
+          }
+        }
+      },
+      CallToolResultSchema
+    );
+    if (imported.isError) {
+      throw new Error(
+        `artifact_import failed: ${imported.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+      );
+    }
+    const readsId = (imported.structuredContent as any).artifact.artifact_id as string;
+
+    const bundle1 = await client.request(
+      { method: "tools/call", params: { name: "qc_bundle_fastq", arguments: { project_id: projectId, reads_1_artifact_id: readsId, backend: "slurm" } } },
+      CallToolResultSchema
+    );
+    if (bundle1.isError) {
+      throw new Error(
+        `qc_bundle_fastq failed: ${bundle1.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+      );
+    }
+
+    const sc1 = bundle1.structuredContent as any;
+    expect(sc1.phase).toBe("fastqc_submitted");
+    expect(sc1.fastqc_run_ids).toHaveLength(1);
+    expect(sc1.expected_collect_run_ids).toEqual(sc1.fastqc_run_ids);
+    expect(sc1.multiqc_run_id).toBeNull();
+    expect(sc1.bundle_report_artifact_id).toMatch(/^art_/);
+
+    const orchestratorRunId = sc1.provenance_run_id as string;
+    const orchestratorRun = await store.getRun(orchestratorRunId as any);
+    expect(orchestratorRun?.status).toBe("queued");
+
+    const outputs = await store.listRunOutputs(orchestratorRunId as any);
+    const roles = outputs.map((o) => o.role).sort();
+    expect(roles).toEqual(["bundle_report", "log"]);
+
+    expect(submitCalls).toBeGreaterThan(submitBefore);
+    const submitAfter = submitCalls;
+
+    // Replay should not resubmit (resultJson exists for slurm queued runs).
+    const bundle2 = await client.request(
+      { method: "tools/call", params: { name: "qc_bundle_fastq", arguments: { project_id: projectId, reads_1_artifact_id: readsId, backend: "slurm" } } },
+      CallToolResultSchema
+    );
+    if (bundle2.isError) {
+      throw new Error(
+        `qc_bundle_fastq failed: ${bundle2.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+      );
+    }
+    expect((bundle2.content[0] as any).text).toContain("Replayed");
+    expect(submitCalls).toBe(submitAfter);
   });
 });
