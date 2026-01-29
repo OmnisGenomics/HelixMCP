@@ -59,7 +59,7 @@ describe.sequential("gateway (in-memory)", () => {
     const artifacts = new ArtifactService(store, objects);
     const policy = await PolicyEngine.loadFromFile(path.resolve("policies/default.policy.yaml"));
     const runsDir = path.join(tmpDir, "runs");
-    const execution = new DefaultExecutionService({ policy, objects, workspaceRootDir: runsDir });
+    const execution = new DefaultExecutionService({ policy });
 
     server = createGatewayServer({ policy, store, artifacts, execution, runsDir });
 

@@ -87,7 +87,7 @@ describe.sequential("slurm (stubbed)", () => {
     };
     const policy = new PolicyEngine(policyConfig);
 
-    const execution = new DefaultExecutionService({ policy, objects, workspaceRootDir: runsDir });
+    const execution = new DefaultExecutionService({ policy });
     const server = createGatewayServer({
       policy,
       store,

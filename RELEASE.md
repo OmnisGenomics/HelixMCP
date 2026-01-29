@@ -1,3 +1,13 @@
+# HelixMCP v0.5.0
+
+This release introduces Toolpacks: a fail-closed, typed registry for scaling tools without turning the gateway into a “god file”.
+
+What is included:
+- Toolpack registration-time validation (name/version invariants, plan kind, declared outputs)
+- JSON-safe canonical params enforcement (toolpacks must produce replayable, hashable params)
+- Centralized Docker execution hardening for toolpacks (digest-pinned images, `network=none`, read-only rootfs, threads/runtime enforced at execution boundary)
+- Built-in toolpacks migrated: `seqkit_stats`, `samtools_flagstat`
+
 # HelixMCP v0.4.0
 
 This release adds a deterministic Slurm “submit + collect” island (apptainer only, network none) while preserving trust-layer invariants.

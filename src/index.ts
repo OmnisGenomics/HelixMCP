@@ -41,7 +41,7 @@ async function main(): Promise<void> {
   const store = new PostgresStore(db);
   const objects = new LocalObjectStore(objectStoreDir);
   const artifacts = new ArtifactService(store, objects);
-  const execution = new DefaultExecutionService({ policy, objects, workspaceRootDir: runsDir });
+  const execution = new DefaultExecutionService({ policy });
 
   const server = createGatewayServer({ policy, store, artifacts, execution, runsDir });
   const transport = new StdioServerTransport();

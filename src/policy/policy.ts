@@ -132,6 +132,20 @@ export class PolicyEngine {
     return this.policy.docker?.network_mode ?? "none";
   }
 
+  assertDockerNetworkNone(): void {
+    const mode = this.dockerNetworkMode();
+    if (mode !== "none") {
+      throw new McpError(ErrorCode.InvalidRequest, `policy denied docker network_mode=${mode} (must be none)`);
+    }
+  }
+
+  assertDockerImagePinned(image: string): void {
+    const pinned = /@sha256:[a-f0-9]{64}$/i.test(String(image));
+    if (!pinned) {
+      throw new McpError(ErrorCode.InvalidRequest, `policy denied docker image (must be pinned by digest): ${image}`);
+    }
+  }
+
   assertDockerImageAllowed(image: string): void {
     const allowlist = this.policy.docker?.image_allowlist ?? [];
     if (!allowlist.length) {
