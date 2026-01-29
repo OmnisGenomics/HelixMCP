@@ -1,3 +1,11 @@
+# HelixMCP v0.6.1
+
+This is a small documentation polish release.
+
+What is included:
+- README Slurm toolpack example: `samtools_flagstat_slurm`
+- README links to `docs/slurm_cluster_smoke.md`
+
 # HelixMCP v0.6.0
 
 This release extends Toolpacks to the Slurm island: toolpacks can now submit deterministic Slurm plans (apptainer-only, network none) with replay semantics.

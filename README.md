@@ -24,6 +24,12 @@ npm test
 HELIXMCP_TEST_DOCKER=1 npm test
 ```
 
+## Slurm toolpack example
+
+- `samtools_flagstat_slurm`: submits a deterministic, policy-gated Slurm plan (apptainer-only, `network=none`) and returns a `run_id` plus Slurm metadata.
+- Use `slurm_job_collect` with that `run_id` to ingest declared `out/` outputs as artifacts.
+- For a cluster smoke test see `docs/slurm_cluster_smoke.md`.
+
 ### Configuration
 
 - `DATABASE_URL` (optional): if unset, gateway uses in-memory Postgres (`pg-mem`) for dev.
