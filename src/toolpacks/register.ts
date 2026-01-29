@@ -176,15 +176,30 @@ function assertDockerPlanInputsMatchLinkedInputs(toolName: string, prepared: { p
   }
 
   const planKeys = new Set<string>();
+  const destNames = new Set<string>();
   for (const inp of planInputs) {
     const role = inp?.role;
     const artifactId = inp?.artifact?.artifactId;
+    const destName = inp?.destName;
     if (typeof role !== "string" || role.trim().length === 0) {
       throw new Error(`toolpack:${toolName}: docker plan.inputs role must be a string`);
+    }
+    if (role !== role.trim()) {
+      throw new Error(`toolpack:${toolName}: docker plan.inputs role must not include leading/trailing whitespace`);
     }
     if (typeof artifactId !== "string" || artifactId.trim().length === 0) {
       throw new Error(`toolpack:${toolName}: docker plan.inputs artifactId must be a string`);
     }
+    if (typeof destName !== "string" || destName.trim().length === 0) {
+      throw new Error(`toolpack:${toolName}: docker plan.inputs destName must be a string`);
+    }
+    if (destName !== destName.trim()) {
+      throw new Error(`toolpack:${toolName}: docker plan.inputs destName must not include leading/trailing whitespace`);
+    }
+    if (destNames.has(destName)) {
+      throw new Error(`toolpack:${toolName}: docker plan.inputs destName collision: ${destName}`);
+    }
+    destNames.add(destName);
     const key = `${role}\u0000${artifactId}`;
     if (planKeys.has(key)) {
       throw new Error(`toolpack:${toolName}: docker plan.inputs contains duplicate role+artifact: ${role} ${artifactId}`);
@@ -198,6 +213,9 @@ function assertDockerPlanInputsMatchLinkedInputs(toolName: string, prepared: { p
     const artifactId = inp?.artifactId;
     if (typeof role !== "string" || role.trim().length === 0) {
       throw new Error(`toolpack:${toolName}: inputsToLink role must be a string`);
+    }
+    if (role !== role.trim()) {
+      throw new Error(`toolpack:${toolName}: inputsToLink role must not include leading/trailing whitespace`);
     }
     if (typeof artifactId !== "string" || artifactId.trim().length === 0) {
       throw new Error(`toolpack:${toolName}: inputsToLink artifactId must be a string`);
