@@ -216,6 +216,26 @@ export class PostgresStore {
     runId: RunId,
     patch: Partial<Pick<RunRecord, "status" | "startedAt" | "finishedAt" | "exitCode" | "error" | "logArtifactId" | "resultJson">>
   ): Promise<void> {
+    if (patch.status) {
+      const current = await this.getRun(runId);
+      if (!current) throw new Error(`unknown run_id: ${runId}`);
+
+      const from = current.status;
+      const to = patch.status;
+      const allowed: Record<RunStatus, RunStatus[]> = {
+        queued: ["queued", "running", "succeeded", "failed", "blocked"],
+        running: ["running", "succeeded", "failed", "blocked"],
+        succeeded: ["succeeded"],
+        failed: ["failed"],
+        blocked: ["blocked"]
+      };
+
+      const ok = allowed[from]?.includes(to) ?? false;
+      if (!ok) {
+        throw new Error(`invalid run status transition: ${from} -> ${to} for run ${runId}`);
+      }
+    }
+
     const updates: Record<string, unknown> = {};
     if (patch.status) updates.status = patch.status;
     if (patch.startedAt !== undefined) updates.started_at = patch.startedAt;

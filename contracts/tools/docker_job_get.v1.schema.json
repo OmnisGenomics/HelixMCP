@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:docker_job_get:v1",
+  "title": "docker_job_get input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["run_id"],
+  "properties": {
+    "run_id": { "$ref": "helixmcp:common#/$defs/RunId" }
+  }
+}

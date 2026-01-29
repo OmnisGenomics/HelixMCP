@@ -42,6 +42,24 @@ Two key rules:
 
 Example: `artifact_list` is snapshot-based. It includes `(as_of_created_at, artifact_count)` in canonical params and filters results to `created_at <= as_of_created_at` so replay is correct even if the project changes later.
 
+## Run lifecycle (explicit state machine)
+
+Runs have an explicit lifecycle:
+
+`created → queued → running → succeeded | failed | blocked`
+
+Rules:
+
+- **No `running → queued`**.
+- **Terminal states are final** (`succeeded`, `failed`, `blocked` never transition again).
+- `job_get` tools are **read-only**: they must not mutate the target run; they create their own observation runs.
+
+Notes:
+
+- Docker tools typically start `running` and finish terminal in one gateway call.
+- Slurm submission creates a `queued` run (submitted) and `slurm_job_collect` finalizes it terminal based on `meta/exit_code.txt`.
+- The database layer fail-closed enforces status transitions to prevent accidental invariant drift.
+
 ## Execution boundary (policy before work runs)
 
 HelixMCP enforces policy twice:
@@ -89,4 +107,3 @@ HelixMCP solves the missing layer for org-grade adoption:
 - execution backends (Docker now; HPC schedulers later)
 
 In practice: BioinfoMCP-style wrappers can plug into HelixMCP’s execution fabric and governance model, while HelixMCP keeps stable, intent-level contracts at the gateway boundary.
-

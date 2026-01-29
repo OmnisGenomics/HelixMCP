@@ -13,6 +13,7 @@ tool_allowlist:
   - artifact_get
   - artifact_list
   - artifact_preview_text
+  - docker_job_get
   - simulate_qc_fastq
   - simulate_align_reads
   - seqkit_stats

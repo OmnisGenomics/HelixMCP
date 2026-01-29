@@ -561,7 +561,7 @@ export function registerToolDefinitions(mcp: McpServer, ctx: ToolContext, tools:
             }
           );
 
-          await toolRun.start();
+          await toolRun.start(selectedKind === "slurm" ? "queued" : "running");
           started = true;
 
           if (selectedKind === "docker") {

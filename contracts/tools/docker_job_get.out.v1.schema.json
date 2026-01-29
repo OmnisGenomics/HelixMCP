@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:docker_job_get:out:v1",
+  "title": "docker_job_get output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "provenance_run_id",
+    "target_run_id",
+    "source",
+    "warnings",
+    "state",
+    "exit_code",
+    "artifacts_by_role",
+    "db",
+    "log_artifact_id"
+  ],
+  "properties": {
+    "provenance_run_id": { "$ref": "helixmcp:common#/$defs/RunId" },
+    "target_run_id": { "$ref": "helixmcp:common#/$defs/RunId" },
+    "source": { "type": "string", "enum": ["db_only"] },
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "state": { "type": "string", "enum": ["queued", "running", "succeeded", "failed", "blocked", "unknown"] },
+    "exit_code": { "type": ["integer", "null"] },
+    "artifacts_by_role": {
+      "type": "object",
+      "additionalProperties": { "$ref": "helixmcp:common#/$defs/ArtifactId" }
+    },
+    "db": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "exit_code", "started_at", "finished_at"],
+      "properties": {
+        "status": { "type": "string", "enum": ["queued", "running", "succeeded", "failed", "blocked", "unknown"] },
+        "exit_code": { "type": ["integer", "null"] },
+        "started_at": { "type": ["string", "null"] },
+        "finished_at": { "type": ["string", "null"] }
+      }
+    },
+    "log_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" }
+  }
+}

@@ -20,6 +20,7 @@ import { PolicyEngine } from "../src/policy/policy.js";
 import { createGatewayServer } from "../src/mcp/gatewayServer.js";
 import { newProjectId } from "../src/core/ids.js";
 import { DefaultExecutionService } from "../src/execution/executionService.js";
+import { deriveRunId } from "../src/runs/runIdentity.js";
 
 const DOCKER_ENABLED = process.env.HELIXMCP_TEST_DOCKER === "1";
 const DOCKER_AVAILABLE =
@@ -40,6 +41,7 @@ describe.sequential("gateway (in-memory)", () => {
   let tmpDir: string;
   let pool: pg.Pool;
   let store: PostgresStore;
+  let policy: PolicyEngine;
   let client: Client;
   let serverTransport: InMemoryTransport;
   let clientTransport: InMemoryTransport;
@@ -57,7 +59,7 @@ describe.sequential("gateway (in-memory)", () => {
     store = new PostgresStore(db);
     const objects = new LocalObjectStore(path.join(tmpDir, "objects"));
     const artifacts = new ArtifactService(store, objects);
-    const policy = await PolicyEngine.loadFromFile(path.resolve("policies/default.policy.yaml"));
+    policy = await PolicyEngine.loadFromFile(path.resolve("policies/default.policy.yaml"));
     const runsDir = path.join(tmpDir, "runs");
     const execution = new DefaultExecutionService({ policy });
 
@@ -218,6 +220,68 @@ describe.sequential("gateway (in-memory)", () => {
     expect(sc3.provenance_run_id).not.toBe(sc1.provenance_run_id);
     expect(sc3.artifact_count).toBe("2");
     expect(sc3.artifacts).toHaveLength(2);
+  });
+
+  it("reports docker job state from the DB", async () => {
+    const projectId = newProjectId();
+
+    const canonicalParams = {
+      project_id: projectId,
+      docker: {
+        image: "example.com/dummy@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        network_mode: "none",
+        argv: ["true"]
+      }
+    };
+
+    const { runId, paramsHash } = deriveRunId({
+      toolName: "dummy_docker_run",
+      contractVersion: "v1",
+      policyHash: policy.policyHash,
+      canonicalParams
+    });
+
+    await store.createRun({
+      runId,
+      projectId,
+      toolName: "dummy_docker_run",
+      contractVersion: "v1",
+      toolVersion: "v1",
+      paramsHash,
+      canonicalParams: canonicalParams as any,
+      policyHash: policy.policyHash,
+      status: "running",
+      requestedBy: null,
+      policySnapshot: policy.snapshot() as any,
+      environment: null
+    });
+
+    const get1 = await client.request(
+      { method: "tools/call", params: { name: "docker_job_get", arguments: { run_id: runId } } },
+      CallToolResultSchema
+    );
+    if (get1.isError) {
+      throw new Error(`docker_job_get failed: ${get1.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`);
+    }
+    const sc1 = get1.structuredContent as any;
+    expect(sc1.target_run_id).toBe(runId);
+    expect(sc1.source).toBe("db_only");
+    expect(sc1.state).toBe("running");
+    expect(sc1.exit_code).toBeNull();
+
+    await store.updateRun(runId as any, { status: "succeeded", finishedAt: new Date().toISOString(), exitCode: 0 });
+
+    const get2 = await client.request(
+      { method: "tools/call", params: { name: "docker_job_get", arguments: { run_id: runId } } },
+      CallToolResultSchema
+    );
+    if (get2.isError) {
+      throw new Error(`docker_job_get failed: ${get2.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`);
+    }
+    const sc2 = get2.structuredContent as any;
+    expect(sc2.target_run_id).toBe(runId);
+    expect(sc2.state).toBe("succeeded");
+    expect(sc2.exit_code).toBe(0);
   });
 
   it.runIf(DOCKER_AVAILABLE)(

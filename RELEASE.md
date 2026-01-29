@@ -1,3 +1,13 @@
+# HelixMCP v0.8.0
+
+This release adds read-only job state observation tools and locks the run lifecycle state machine.
+
+What is included:
+- `slurm_job_get`: workspace-first state; optional scheduler query (`sacct` → `squeue`) behind `slurm.allow_scheduler_queries` (default false)
+- `docker_job_get`: DB-only state observation for Docker-backed runs (no external calls)
+- Fail-closed run status transitions (no `running → queued`; terminal states never transition)
+- Run lifecycle documented in `ARCHITECTURE.md`
+
 # HelixMCP v0.7.0
 
 This release adds hybrid toolpacks: a single tool can run on Docker or submit a Slurm job while preserving deterministic identity, policy-gated execution, and replay semantics.

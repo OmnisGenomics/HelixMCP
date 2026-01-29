@@ -311,3 +311,23 @@ export const zSlurmJobGetOutput = zProvenance.extend({
     .nullable(),
   log_artifact_id: zArtifactId
 });
+
+export const zDockerJobGetInput = z.object({
+  run_id: zRunId
+});
+
+export const zDockerJobGetOutput = zProvenance.extend({
+  target_run_id: zRunId,
+  source: z.literal("db_only"),
+  warnings: z.array(z.string()),
+  state: zRunState,
+  exit_code: z.number().int().nullable(),
+  artifacts_by_role: z.record(z.string(), zArtifactId),
+  db: z.object({
+    status: zRunState,
+    exit_code: z.number().int().nullable(),
+    started_at: z.string().nullable(),
+    finished_at: z.string().nullable()
+  }),
+  log_artifact_id: zArtifactId
+});

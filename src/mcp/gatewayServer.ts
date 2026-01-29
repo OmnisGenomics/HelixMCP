@@ -32,6 +32,8 @@ import {
   zArtifactListOutput,
   zArtifactPreviewTextInput,
   zArtifactPreviewTextOutput,
+  zDockerJobGetInput,
+  zDockerJobGetOutput,
   zExportNextflowInput,
   zExportNextflowOutput,
   zSlurmJobCollectInput,
@@ -74,7 +76,7 @@ function toArtifactSummary(a: ArtifactRecord): JsonObject {
 export function createGatewayServer(deps: GatewayDeps): McpServer {
   const mcp = new McpServer({
     name: "helixmcp-biomcp-fabric-gateway",
-    version: "0.7.0"
+    version: "0.8.0"
   });
 
   const slurmSubmitter = deps.slurmSubmitter ?? new SbatchSubmitter();
@@ -292,7 +294,7 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
           }
         );
 
-        await toolRun.start();
+        await toolRun.start("queued");
         started = true;
         await toolRun.linkInput(artifact.artifactId, "artifact");
 
@@ -375,7 +377,7 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
           }
         );
 
-        await toolRun.start();
+        await toolRun.start("queued");
         started = true;
         const artifacts = await deps.artifacts.listArtifacts(projectId, args.limit, snapshot.asOfCreatedAt);
         const structured = await toolRun.finishSuccess(
@@ -466,7 +468,7 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
           }
         );
 
-        await toolRun.start();
+        await toolRun.start("queued");
         started = true;
         await toolRun.linkInput(artifact.artifactId, "artifact");
 
@@ -898,7 +900,7 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
           }
         );
 
-        await toolRun.start();
+        await toolRun.start("queued");
         started = true;
 
         deps.policy.assertSlurmPartitionAllowed(jobSpec.placement.partition);
@@ -979,6 +981,141 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
 
         return {
           content: [{ type: "text", text: `slurm submitted (run ${structured.provenance_run_id as string})` }],
+          structuredContent: structured
+        };
+      } catch (e) {
+        if (e instanceof McpError) {
+          if (toolRun && started) {
+            if (e.code === ErrorCode.InvalidRequest) await toolRun.finishBlocked(e.message);
+            else await toolRun.finishFailure(e.message);
+          }
+          throw e;
+        }
+        if (e instanceof Error) {
+          if (toolRun && started) await toolRun.finishFailure(e.message);
+          throw e;
+        }
+        if (toolRun && started) await toolRun.finishFailure("unknown error");
+        throw new Error("unknown error");
+      }
+    }
+  );
+
+  mcp.registerTool(
+    "docker_job_get",
+    {
+      description: "Get current state for a Docker-backed run (DB-only; no external calls).",
+      inputSchema: zDockerJobGetInput,
+      outputSchema: zDockerJobGetOutput
+    },
+    async (args, extra) => {
+      const toolName = "docker_job_get";
+      const contractVersion = "v1";
+      const targetRunId = args.run_id as RunId;
+      let toolRun: ToolRun | null = null;
+      let started = false;
+
+      try {
+        deps.policy.assertToolAllowed(toolName);
+
+        const targetRun = await deps.store.getRun(targetRunId);
+        if (!targetRun) throw new McpError(ErrorCode.InvalidParams, `unknown run_id: ${targetRunId}`);
+
+        const targetParams = await deps.store.getParamSet(targetRun.paramsHash);
+        const dockerSpec = (targetParams as any)?.docker as unknown;
+        if (!dockerSpec || typeof dockerSpec !== "object") {
+          throw new McpError(
+            ErrorCode.InvalidRequest,
+            `target run does not look like a docker-backed run: ${targetRunId} (use slurm_job_get for Slurm runs)`
+          );
+        }
+
+        const outputs = await deps.store.listRunOutputs(targetRunId);
+        const artifactsByRole: Record<string, string> = {};
+        const roleSeen = new Set<string>();
+        const warnings: string[] = [];
+        for (const o of outputs) {
+          if (roleSeen.has(o.role)) {
+            warnings.push(`multiple artifacts linked for role=${o.role}; using first`);
+            continue;
+          }
+          roleSeen.add(o.role);
+          artifactsByRole[o.role] = o.artifactId;
+        }
+
+        const dbStatus = targetRun.status;
+        const dbExitCode = targetRun.exitCode ?? null;
+        const dbStartedAt = targetRun.startedAt ?? null;
+        const dbFinishedAt = targetRun.finishedAt ?? null;
+
+        let state: "queued" | "running" | "succeeded" | "failed" | "blocked" | "unknown" = dbStatus;
+        let exitCode: number | null = dbExitCode;
+
+        if (dbFinishedAt && dbExitCode !== null) {
+          state = dbExitCode === 0 ? "succeeded" : "failed";
+        }
+        if (dbStatus === "blocked") state = "blocked";
+
+        const canonicalParams: JsonObject = {
+          target_run_id: targetRunId,
+          observation: {
+            state,
+            exit_code: exitCode,
+            db: { status: dbStatus, exit_code: dbExitCode, started_at: dbStartedAt, finished_at: dbFinishedAt },
+            artifacts_by_role: artifactsByRole
+          }
+        };
+
+        const { runId, paramsHash } = deriveRunId({
+          toolName,
+          contractVersion,
+          policyHash: deps.policy.policyHash,
+          canonicalParams
+        });
+
+        const existing = await deps.store.getRun(runId);
+        if (existing?.status === "succeeded" && existing.resultJson) {
+          return {
+            content: [{ type: "text", text: `Replayed ${toolName} (${runId})` }],
+            structuredContent: existing.resultJson
+          };
+        }
+
+        toolRun = new ToolRun(
+          { store: deps.store, artifacts: deps.artifacts },
+          {
+            runId,
+            projectId: targetRun.projectId,
+            toolName,
+            contractVersion,
+            toolVersion: "v1",
+            paramsHash,
+            canonicalParams,
+            policyHash: deps.policy.policyHash,
+            requestedBy: requestedByFromExtra(extra),
+            policySnapshot: deps.policy.snapshot() as JsonObject,
+            environment: envSnapshot()
+          }
+        );
+
+        await toolRun.start();
+        started = true;
+
+        const structured = await toolRun.finishSuccess(
+          {
+            target_run_id: targetRunId,
+            source: "db_only",
+            warnings,
+            state,
+            exit_code: exitCode,
+            artifacts_by_role: artifactsByRole,
+            db: { status: dbStatus, exit_code: dbExitCode, started_at: dbStartedAt, finished_at: dbFinishedAt }
+          },
+          "docker job get ok"
+        );
+
+        return {
+          content: [{ type: "text", text: `docker job state: ${state}` }],
           structuredContent: structured
         };
       } catch (e) {
