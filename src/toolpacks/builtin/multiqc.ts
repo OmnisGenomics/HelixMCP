@@ -102,9 +102,8 @@ export const multiqcTool: ToolDefinition<Args, DockerExecutionPlan | SlurmExecut
     const sorted = [...artifacts].sort((a, b) => {
       const c = a.checksumSha256.localeCompare(b.checksumSha256);
       if (c !== 0) return c;
-      const sa = Number(a.sizeBytes);
-      const sb = Number(b.sizeBytes);
-      if (sa !== sb) return sa - sb;
+      if (a.sizeBytes < b.sizeBytes) return -1;
+      if (a.sizeBytes > b.sizeBytes) return 1;
       return a.artifactId.localeCompare(b.artifactId);
     });
 
@@ -338,4 +337,3 @@ export const multiqcTool: ToolDefinition<Args, DockerExecutionPlan | SlurmExecut
     };
   }
 };
-
