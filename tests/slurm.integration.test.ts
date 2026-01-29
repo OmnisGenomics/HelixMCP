@@ -150,7 +150,11 @@ describe.sequential("slurm (stubbed)", () => {
       execution: {
         kind: "container",
         container: { engine: "apptainer", image: APPTAINER_SAMTOOLS_IMAGE, network_mode: "none", readonly_rootfs: true },
-        command: { argv: ["samtools", "flagstat", "/work/in/input.bam"], workdir: "/work", env: {} }
+        command: {
+          argv: ["sh", "-c", "set -euo pipefail; samtools flagstat /work/in/input.bam > /work/out/samtools_flagstat.txt"],
+          workdir: "/work",
+          env: {}
+        }
       },
       io: {
         inputs: [{ role: "bam", artifact_id: bamId, checksum_sha256: bamChecksum, dest_relpath: "in/input.bam" }],

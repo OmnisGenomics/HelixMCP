@@ -70,7 +70,7 @@ slurm:
           "readonly_rootfs": true
         },
         "command": {
-          "argv": ["samtools", "flagstat", "/work/in/input.bam"],
+          "argv": ["sh", "-c", "set -euo pipefail; samtools flagstat /work/in/input.bam > /work/out/samtools_flagstat.txt"],
           "workdir": "/work",
           "env": {}
         }
@@ -135,4 +135,3 @@ Expected behavior:
 - `stdout`/`stderr` are imported as log artifacts if present (with `slurm.max_collect_log_bytes` enforced).
 - Target run is finalized exactly once; repeat collects are idempotent and do not rewrite `finishedAt`.
 - `artifacts_by_role` includes declared roles plus `stdout`, `stderr`, and `slurm_script` when available.
-
