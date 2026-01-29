@@ -234,6 +234,18 @@ export class PolicyEngine {
   }
 
   assertSlurmApptainerImageAllowed(image: string): void {
+    const str = String(image);
+    if (!str.startsWith("docker://")) {
+      throw new McpError(ErrorCode.InvalidRequest, `policy denied apptainer image (must start with docker://): ${image}`);
+    }
+    const pinned = /@sha256:[a-f0-9]{64}$/i.test(str);
+    if (!pinned) {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `policy denied apptainer image (must be pinned by digest): ${image}`
+      );
+    }
+
     const slurm = this.requireSlurm();
     const allowlist = slurm.apptainer.image_allowlist ?? [];
     if (!allowlist.length) {

@@ -449,4 +449,144 @@ describe("toolpacks", () => {
       await rm(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it("fails closed when slurm plan outputs do not match declaredOutputs", async () => {
+    const tmpDir = await mkdtemp(path.join(os.tmpdir(), "helixmcp-toolpacks-"));
+    let pool: pg.Pool | null = null;
+    let client: Client | null = null;
+    let clientTransport: InMemoryTransport | null = null;
+    let serverTransport: InMemoryTransport | null = null;
+    let submitCalls = 0;
+    let runCalled = false;
+
+    try {
+      const mem = newDb({ autoCreateForeignKeyIndices: true });
+      const adapter = mem.adapters.createPg();
+      pool = new adapter.Pool() as unknown as pg.Pool;
+      await applySqlFile(pool, path.resolve("db/schema.sql"));
+
+      const db = createDb(pool);
+      const store = new PostgresStore(db);
+      const objects = new LocalObjectStore(path.join(tmpDir, "objects"));
+      const artifacts = new ArtifactService(store, objects);
+      const runsDir = path.join(tmpDir, "runs");
+
+      const APPTAINER_IMAGE =
+        "docker://quay.io/biocontainers/samtools@sha256:bf80e07e650becfd084db1abde0fe932b50f990a07fa56421ea647b552b5a406";
+
+      const policy = new PolicyEngine({
+        version: 1,
+        runtime: { instance_id: "local" },
+        tool_allowlist: ["mismatch_slurm_tool"],
+        quotas: { max_threads: 4, max_runtime_seconds: 10, max_import_bytes: 1024 * 1024 },
+        imports: { allow_source_kinds: ["inline_text"], local_path_prefix_allowlist: [], deny_symlinks: true },
+        docker: { network_mode: "none", image_allowlist: [] },
+        slurm: {
+          partitions_allowlist: ["short"],
+          accounts_allowlist: ["bio"],
+          qos_allowlist: [],
+          constraints_allowlist: [],
+          max_time_limit_seconds: 3600,
+          max_cpus: 4,
+          max_mem_mb: 8192,
+          max_gpus: 0,
+          max_collect_output_bytes: 1024 * 1024,
+          max_collect_log_bytes: 1024 * 1024,
+          gpu_types_allowlist: [],
+          apptainer: { image_allowlist: [APPTAINER_IMAGE] },
+          network_mode_required: "none"
+        }
+      });
+
+      const slurmSubmitter = {
+        submit: async (_scriptPath: string) => {
+          submitCalls += 1;
+          return { slurmJobId: "11111", stdout: "11111\n", stderr: "" };
+        }
+      };
+
+      const projectId = "proj_01HZZZZZZZZZZZZZZZZZZZZZZZ";
+      const input = await artifacts.importArtifact({
+        projectId: projectId as any,
+        source: { kind: "inline_text", text: "FAKEBAM\n" },
+        typeHint: "BAM",
+        label: "input.bam",
+        createdByRunId: null,
+        maxBytes: null
+      });
+
+      const mcp = new McpServer({ name: "helixmcp-test", version: "0.0.0" });
+
+      const mismatchTool = {
+        toolName: "mismatch_slurm_tool",
+        contractVersion: "v1",
+        planKind: "slurm" as const,
+        description: "Mismatch plan outputs vs declaredOutputs (test only).",
+        inputSchema: z.object({ project_id: z.string(), bam_artifact_id: z.string() }),
+        outputSchema: z.object({}),
+        declaredOutputs: [{ role: "report", type: "TEXT", label: "report.txt", srcRelpath: "out/report.txt" }],
+        canonicalize: async (args: any, ctx: any) => {
+          const bam = await ctx.artifacts.getArtifact(args.bam_artifact_id);
+          if (!bam) throw new Error("missing bam");
+          return {
+            projectId: args.project_id,
+            canonicalParams: { project_id: args.project_id, stable: true },
+            toolVersion: "slurm_script_v1",
+            plan: {
+              version: 1,
+              resources: { time_limit_seconds: 60, cpus: 1, mem_mb: 512, gpus: null, gpu_type: null },
+              placement: { partition: "short", account: "bio", qos: null, constraint: null },
+              execution: {
+                kind: "container",
+                container: { engine: "apptainer", image: APPTAINER_IMAGE, network_mode: "none", readonly_rootfs: true },
+                command: { argv: ["samtools", "flagstat", "/work/in/input.bam"], workdir: "/work", env: {} }
+              },
+              io: {
+                inputs: [
+                  {
+                    role: "bam",
+                    artifact_id: bam.artifactId,
+                    checksum_sha256: bam.checksumSha256,
+                    dest_relpath: "in/input.bam"
+                  }
+                ],
+                // Mismatch: src_relpath differs from declaredOutputs.srcRelpath.
+                outputs: [{ role: "report", src_relpath: "out/NOT_report.txt", type: "TEXT", label: "report.txt" }]
+              }
+            } satisfies SlurmExecutionPlan,
+            inputsToLink: [{ artifactId: bam.artifactId, role: "bam" }]
+          };
+        },
+        run: async () => {
+          runCalled = true;
+          throw new Error("unreachable");
+        }
+      };
+
+      registerToolDefinitions(mcp, { policy, store, artifacts, runsDir, slurmSubmitter }, [mismatchTool] as any);
+
+      [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      await mcp.connect(serverTransport);
+
+      client = new Client({ name: "helixmcp-test-client", version: "0.0.0" });
+      await client.connect(clientTransport);
+
+      const res = await client.request(
+        {
+          method: "tools/call",
+          params: { name: "mismatch_slurm_tool", arguments: { project_id: projectId, bam_artifact_id: input.artifactId } }
+        },
+        CallToolResultSchema
+      );
+
+      expect(res.isError).toBe(true);
+      expect(runCalled).toBe(false);
+      expect(submitCalls).toBe(0);
+    } finally {
+      if (clientTransport) await clientTransport.close();
+      if (serverTransport) await serverTransport.close();
+      if (pool) await pool.end();
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
