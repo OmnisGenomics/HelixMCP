@@ -1,3 +1,13 @@
+# HelixMCP v0.8.1
+
+This release adds a deterministic, audit-friendly FASTQ QC on-ramp built from toolpacks.
+
+What is included:
+- `MD` artifact type end-to-end (contracts + schemas + MIME + allowlists)
+- FASTQ QC toolpacks shipped: `fastqc`, `multiqc`, `qc_bundle_fastq`
+- `qc_bundle_fastq` supports explicit Slurm multi-step phases (A/B queued, C final) using DB truth only (no scheduler polling)
+- Regression guard: Slurm phase A checkpoints queued without requiring MultiQC outputs; replay does not resubmit
+
 # HelixMCP v0.8.0
 
 This release adds read-only job state observation tools and locks the run lifecycle state machine.

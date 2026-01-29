@@ -32,6 +32,16 @@ HELIXMCP_TEST_DOCKER=1 npm test
 - Set `execution.default_backend: "slurm"` in policy to make Slurm the default (requires `slurm` policy config).
 - For a cluster smoke test see `docs/slurm_cluster_smoke.md`.
 
+## FASTQ QC bundle (Slurm multi-step)
+
+The `qc_bundle_fastq` tool is deterministic and audit-friendly. On `backend: "slurm"` it never polls; it advances only when run state and artifacts are visible in Postgres.
+
+1. Call `qc_bundle_fastq` (returns `phase="fastqc_submitted"` and `expected_collect_run_ids`).
+2. Collect each FastQC run: call `slurm_job_collect` for every run id listed.
+3. Call `qc_bundle_fastq` again (returns `phase="multiqc_submitted"` and the MultiQC run id to collect).
+4. Collect the MultiQC run: call `slurm_job_collect` for that run id.
+5. Call `qc_bundle_fastq` a final time to get `phase="complete"` and the final `bundle_report_artifact_id`.
+
 ### Configuration
 
 - `DATABASE_URL` (optional): if unset, gateway uses in-memory Postgres (`pg-mem`) for dev.
