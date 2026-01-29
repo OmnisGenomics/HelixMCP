@@ -1,6 +1,5 @@
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import { promises as fs } from "fs";
-import type { ArtifactRecord } from "../../core/artifact.js";
 import type { ArtifactId, ProjectId, RunId } from "../../core/ids.js";
 import type { JsonObject } from "../../core/json.js";
 import { zSeqkitStatsInput, zSeqkitStatsOutput } from "../../mcp/toolSchemas.js";
@@ -105,6 +104,7 @@ export const seqkitStatsTool: ToolDefinition<Args, DockerExecutionPlan> = {
       canonicalParams,
       toolVersion: SEQKIT_IMAGE,
       plan: docker,
+      selectedPlanKind: "docker",
       inputsToLink: [{ artifactId: input.artifactId, role: "input" }]
     };
   },

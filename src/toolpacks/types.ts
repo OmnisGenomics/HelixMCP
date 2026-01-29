@@ -16,7 +16,8 @@ export interface ToolContext {
   slurmSubmitter?: SlurmSubmitter;
 }
 
-export type ToolPlanKind = "docker" | "slurm";
+export type ToolPlanKind = "docker" | "slurm" | "hybrid";
+export type SelectedPlanKind = Exclude<ToolPlanKind, "hybrid">;
 
 export interface ToolDeclaredOutput {
   role: string;
@@ -37,6 +38,7 @@ export interface PreparedToolRun<TPlan> {
   canonicalParams: JsonObject;
   toolVersion: string;
   plan: TPlan;
+  selectedPlanKind: SelectedPlanKind;
   inputsToLink: Array<{ artifactId: ArtifactId; role: string }>;
 }
 

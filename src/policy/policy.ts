@@ -9,6 +9,9 @@ export interface PolicyConfig {
   runtime?: {
     instance_id: string;
   };
+  execution?: {
+    default_backend?: "docker" | "slurm";
+  };
   tool_allowlist: string[];
   quotas: {
     max_threads: number;
@@ -113,6 +116,10 @@ export class PolicyEngine {
     if (typeof raw !== "string") return null;
     const trimmed = raw.trim();
     return trimmed.length > 0 ? trimmed : null;
+  }
+
+  defaultBackend(): "docker" | "slurm" {
+    return this.policy.execution?.default_backend === "slurm" ? "slurm" : "docker";
   }
 
   previewCaps(): { maxBytes: number; maxLines: number } {

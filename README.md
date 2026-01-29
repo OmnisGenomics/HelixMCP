@@ -24,10 +24,11 @@ npm test
 HELIXMCP_TEST_DOCKER=1 npm test
 ```
 
-## Slurm toolpack example
+## Hybrid toolpack example (Docker or Slurm)
 
-- `samtools_flagstat_slurm`: submits a deterministic, policy-gated Slurm plan (apptainer-only, `network=none`) and returns a `run_id` plus Slurm metadata.
-- Use `slurm_job_collect` with that `run_id` to ingest declared `out/` outputs as artifacts.
+- `samtools_flagstat` supports `backend: "docker" | "slurm"` (default via policy; falls back to `"docker"`).
+- With `backend: "slurm"`, the tool checkpoints `queued` and returns a `run_id` plus Slurm metadata; use `slurm_job_collect` to ingest declared `out/` outputs as artifacts.
+- Set `execution.default_backend: "slurm"` in policy to make Slurm the default (requires `slurm` policy config).
 - For a cluster smoke test see `docs/slurm_cluster_smoke.md`.
 
 ### Configuration

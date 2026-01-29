@@ -1,5 +1,4 @@
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
-import type { ArtifactRecord } from "../../core/artifact.js";
 import type { ArtifactId, ProjectId, RunId } from "../../core/ids.js";
 import type { JsonObject } from "../../core/json.js";
 import { zSamtoolsFlagstatInput, zSlurmSubmitOutput } from "../../mcp/toolSchemas.js";
@@ -120,6 +119,7 @@ export const samtoolsFlagstatSlurmTool: ToolDefinition<Args, SlurmExecutionPlan>
       canonicalParams,
       toolVersion: "slurm_script_v1",
       plan,
+      selectedPlanKind: "slurm",
       inputsToLink: [{ artifactId: bam.artifactId, role: "bam" }]
     };
   },
@@ -154,4 +154,3 @@ export const samtoolsFlagstatSlurmTool: ToolDefinition<Args, SlurmExecutionPlan>
     };
   }
 };
-

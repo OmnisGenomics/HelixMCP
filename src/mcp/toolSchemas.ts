@@ -267,3 +267,11 @@ export const zSlurmJobCollectOutput = zProvenance.extend({
   artifacts_by_role: z.record(z.string(), zArtifactId),
   log_artifact_id: zArtifactId
 });
+
+export const zBackend = z.enum(["docker", "slurm"]);
+
+export const zSamtoolsFlagstatInputV2 = zSamtoolsFlagstatInput.extend({
+  backend: zBackend.optional()
+});
+
+export const zSamtoolsFlagstatOutputV2 = z.union([zSamtoolsFlagstatOutput, zSlurmSubmitOutput]);

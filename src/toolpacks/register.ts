@@ -87,7 +87,7 @@ function validateToolDefinitions(tools: Array<ToolDefinition<any, any>>): void {
       throw new Error(`toolpack:${tool.toolName}: invalid contractVersion: ${tool.contractVersion}`);
     }
 
-    if (tool.planKind !== "docker" && tool.planKind !== "slurm") {
+    if (tool.planKind !== "docker" && tool.planKind !== "slurm" && tool.planKind !== "hybrid") {
       throw new Error(`toolpack:${tool.toolName}: invalid planKind: ${String((tool as any).planKind)}`);
     }
 
@@ -113,7 +113,7 @@ function validateToolDefinitions(tools: Array<ToolDefinition<any, any>>): void {
         throw new Error(`toolpack:${tool.toolName}: invalid output label for role ${out.role}`);
       }
 
-      if (tool.planKind === "slurm") {
+      if (tool.planKind === "slurm" || tool.planKind === "hybrid") {
         if (typeof out.srcRelpath !== "string" || out.srcRelpath.trim().length === 0 || out.srcRelpath.length > 256) {
           throw new Error(`toolpack:${tool.toolName}: slurm outputs must declare srcRelpath for role ${out.role}`);
         }
@@ -519,6 +519,13 @@ export function registerToolDefinitions(mcp: McpServer, ctx: ToolContext, tools:
           ctx.policy.assertToolAllowed(toolName);
 
           const prepared = await tool.canonicalize(args, ctx);
+          const selectedKind = prepared.selectedPlanKind;
+          if (selectedKind !== "docker" && selectedKind !== "slurm") {
+            throw new Error(`toolpack:${toolName}: selectedPlanKind must be "docker" or "slurm"`);
+          }
+          if (tool.planKind !== "hybrid" && selectedKind !== tool.planKind) {
+            throw new Error(`toolpack:${toolName}: selectedPlanKind=${selectedKind} must match planKind=${tool.planKind}`);
+          }
           assertJsonSafe(prepared.canonicalParams, `toolpack:${toolName}: canonicalParams`);
           prepared.canonicalParams = canonicalizeToolpackCanonicalParams(prepared.canonicalParams, `toolpack:${toolName}: canonicalParams`);
 
@@ -530,7 +537,7 @@ export function registerToolDefinitions(mcp: McpServer, ctx: ToolContext, tools:
           });
 
           const existing = await ctx.store.getRun(runId);
-          if (existing?.resultJson && (tool.planKind === "slurm" || existing.status === "succeeded")) {
+          if (existing?.resultJson && (selectedKind === "slurm" || existing.status === "succeeded")) {
             return {
               content: [{ type: "text", text: `Replayed ${toolName} (${runId})` }],
               structuredContent: existing.resultJson
@@ -557,7 +564,7 @@ export function registerToolDefinitions(mcp: McpServer, ctx: ToolContext, tools:
           await toolRun.start();
           started = true;
 
-          if (tool.planKind === "docker") {
+          if (selectedKind === "docker") {
             assertDockerPlanInputsMatchLinkedInputs(toolName, prepared);
           } else {
             assertSlurmPlanInputsMatchLinkedInputs(toolName, prepared);
@@ -570,14 +577,14 @@ export function registerToolDefinitions(mcp: McpServer, ctx: ToolContext, tools:
 
           const res = await tool.run({ runId, toolRun, prepared, ctx });
           let structured: JsonObject;
-          if (tool.planKind === "docker") {
+          if (selectedKind === "docker") {
             await assertDeclaredOutputsSatisfied(ctx, tool, runId);
             structured = await toolRun.finishSuccess(res.result, res.summary);
           } else {
             structured = await toolRun.checkpointQueued(res.result, res.summary);
           }
 
-          const verb = tool.planKind === "slurm" ? "queued" : "complete";
+          const verb = selectedKind === "slurm" ? "queued" : "complete";
 
           return {
             content: [{ type: "text", text: `${toolName} ${verb} (run ${structured.provenance_run_id as string})` }],
