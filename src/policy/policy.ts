@@ -34,6 +34,7 @@ export interface PolicyConfig {
     accounts_allowlist: string[];
     qos_allowlist?: string[];
     constraints_allowlist?: string[];
+    allow_scheduler_queries?: boolean;
     max_time_limit_seconds: number;
     max_cpus: number;
     max_mem_mb: number;
@@ -292,6 +293,12 @@ export class PolicyEngine {
       throw new McpError(ErrorCode.InvalidRequest, `policy denied slurm collect logs (no max_collect_log_bytes configured)`);
     }
     return BigInt(value);
+  }
+
+  allowSlurmSchedulerQueries(): boolean {
+    const slurm = this.policy.slurm;
+    if (!slurm) return false;
+    return slurm.allow_scheduler_queries === true;
   }
 
   enforceThreads(toolName: string, requestedThreads: number | undefined): number {

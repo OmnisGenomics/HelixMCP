@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:slurm_job_get:out:v1",
+  "title": "slurm_job_get output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "provenance_run_id",
+    "target_run_id",
+    "slurm_job_id",
+    "source",
+    "warnings",
+    "state",
+    "exit_code",
+    "artifacts_by_role",
+    "db",
+    "workspace",
+    "scheduler",
+    "log_artifact_id"
+  ],
+  "properties": {
+    "provenance_run_id": { "$ref": "helixmcp:common#/$defs/RunId" },
+    "target_run_id": { "$ref": "helixmcp:common#/$defs/RunId" },
+    "slurm_job_id": { "type": ["string", "null"], "minLength": 1, "maxLength": 64 },
+    "source": { "type": "string", "enum": ["workspace_only", "workspace+sacct", "workspace+squeue"] },
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "state": { "type": "string", "enum": ["queued", "running", "succeeded", "failed", "blocked", "unknown"] },
+    "exit_code": { "type": ["integer", "null"] },
+    "artifacts_by_role": {
+      "type": "object",
+      "additionalProperties": { "$ref": "helixmcp:common#/$defs/ArtifactId" }
+    },
+    "db": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "exit_code", "finished_at"],
+      "properties": {
+        "status": { "type": "string", "enum": ["queued", "running", "succeeded", "failed", "blocked", "unknown"] },
+        "exit_code": { "type": ["integer", "null"] },
+        "finished_at": { "type": ["string", "null"] }
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["has_stdout", "has_stderr", "has_exit_code", "exit_code"],
+      "properties": {
+        "has_stdout": { "type": "boolean" },
+        "has_stderr": { "type": "boolean" },
+        "has_exit_code": { "type": "boolean" },
+        "exit_code": { "type": ["integer", "null"] }
+      }
+    },
+    "scheduler": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["source", "state_raw", "exit_code"],
+      "properties": {
+        "source": { "type": ["string", "null"], "enum": ["sacct", "squeue", null] },
+        "state_raw": { "type": ["string", "null"] },
+        "exit_code": { "type": ["integer", "null"] }
+      }
+    },
+    "log_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" }
+  }
+}

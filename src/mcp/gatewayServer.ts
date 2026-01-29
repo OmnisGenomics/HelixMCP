@@ -18,6 +18,8 @@ import { createRunWorkspace, safeJoin } from "../execution/workspace.js";
 import { renderSlurmScriptV1, type SlurmJobSpecV1 } from "../execution/slurm/slurmScriptV1.js";
 import type { SlurmSubmitter } from "../execution/slurm/submitter.js";
 import { SbatchSubmitter } from "../execution/slurm/submitter.js";
+import type { SlurmScheduler } from "../execution/slurm/scheduler.js";
+import { SystemSlurmScheduler } from "../execution/slurm/scheduler.js";
 import { envSnapshot } from "./envSnapshot.js";
 import { registerToolDefinitions } from "../toolpacks/register.js";
 import { builtinToolDefinitions } from "../toolpacks/builtin/index.js";
@@ -34,6 +36,8 @@ import {
   zExportNextflowOutput,
   zSlurmJobCollectInput,
   zSlurmJobCollectOutput,
+  zSlurmJobGetInput,
+  zSlurmJobGetOutput,
   zSlurmSubmitInput,
   zSlurmSubmitOutput,
   zSimulateAlignReadsInput,
@@ -49,6 +53,7 @@ export interface GatewayDeps {
   execution: ExecutionService;
   runsDir: string;
   slurmSubmitter?: SlurmSubmitter;
+  slurmScheduler?: SlurmScheduler;
 }
 
 function toArtifactSummary(a: ArtifactRecord): JsonObject {
@@ -73,6 +78,7 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
   });
 
   const slurmSubmitter = deps.slurmSubmitter ?? new SbatchSubmitter();
+  const slurmScheduler = deps.slurmScheduler ?? new SystemSlurmScheduler();
 
   const ARTIFACT_TYPE_SET = new Set<ArtifactType>([
     "FASTQ_GZ",
@@ -973,6 +979,227 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
 
         return {
           content: [{ type: "text", text: `slurm submitted (run ${structured.provenance_run_id as string})` }],
+          structuredContent: structured
+        };
+      } catch (e) {
+        if (e instanceof McpError) {
+          if (toolRun && started) {
+            if (e.code === ErrorCode.InvalidRequest) await toolRun.finishBlocked(e.message);
+            else await toolRun.finishFailure(e.message);
+          }
+          throw e;
+        }
+        if (e instanceof Error) {
+          if (toolRun && started) await toolRun.finishFailure(e.message);
+          throw e;
+        }
+        if (toolRun && started) await toolRun.finishFailure("unknown error");
+        throw new Error("unknown error");
+      }
+    }
+  );
+
+  mcp.registerTool(
+    "slurm_job_get",
+    {
+      description: "Get current state for a Slurm-submitted run (workspace-first; optional scheduler query via policy).",
+      inputSchema: zSlurmJobGetInput,
+      outputSchema: zSlurmJobGetOutput
+    },
+    async (args, extra) => {
+      const toolName = "slurm_job_get";
+      const contractVersion = "v1";
+      const targetRunId = args.run_id as RunId;
+      let toolRun: ToolRun | null = null;
+      let started = false;
+
+      try {
+        deps.policy.assertToolAllowed(toolName);
+
+        const targetRun = await deps.store.getRun(targetRunId);
+        if (!targetRun) throw new McpError(ErrorCode.InvalidParams, `unknown run_id: ${targetRunId}`);
+
+        const targetParams = await deps.store.getParamSet(targetRun.paramsHash);
+        const slurmOutputs = (((targetParams as any)?.slurm as any)?.io as any)?.outputs;
+        if (!Array.isArray(slurmOutputs)) {
+          throw new McpError(ErrorCode.InvalidRequest, `target run does not look like a slurm-submitted run: ${targetRunId}`);
+        }
+
+        const readOptionalText = async (filePath: string, context: string): Promise<string | null> => {
+          try {
+            await assertRegularFileNoSymlink(filePath, context);
+            return (await fs.readFile(filePath, "utf8")).trim();
+          } catch {
+            return null;
+          }
+        };
+
+        const hasRegularFile = async (filePath: string, context: string): Promise<boolean> => {
+          try {
+            await assertRegularFileNoSymlink(filePath, context);
+            return true;
+          } catch {
+            return false;
+          }
+        };
+
+        const wsRootDir = path.resolve(deps.runsDir, targetRunId);
+        const jobIdPath = safeJoin(wsRootDir, path.join("meta", "slurm_job_id.txt"));
+        const exitCodePath = safeJoin(wsRootDir, path.join("meta", "exit_code.txt"));
+        const stdoutPath = safeJoin(wsRootDir, path.join("meta", "stdout.txt"));
+        const stderrPath = safeJoin(wsRootDir, path.join("meta", "stderr.txt"));
+
+        const jobIdFromFile = await readOptionalText(jobIdPath, "slurm_job_id");
+        const jobIdFromResult =
+          typeof (targetRun.resultJson as any)?.slurm_job_id === "string" ? ((targetRun.resultJson as any).slurm_job_id as string) : null;
+        const slurmJobId = jobIdFromFile ?? jobIdFromResult;
+
+        const exitCodeText = await readOptionalText(exitCodePath, "exit_code");
+        const workspaceExitCode =
+          exitCodeText && Number.isInteger(Number.parseInt(exitCodeText, 10)) ? Number.parseInt(exitCodeText, 10) : null;
+
+        const hasStdout = await hasRegularFile(stdoutPath, "stdout");
+        const hasStderr = await hasRegularFile(stderrPath, "stderr");
+
+        const warnings: string[] = [];
+        let schedulerInfo: { source: "sacct" | "squeue"; state_raw: string; exit_code: number | null } | null = null;
+        let schedulerNormalized: "queued" | "running" | "succeeded" | "failed" | "unknown" | null = null;
+        let source: "workspace_only" | "workspace+sacct" | "workspace+squeue" = "workspace_only";
+
+        if (!deps.policy.allowSlurmSchedulerQueries()) {
+          warnings.push("scheduler query skipped: disabled by policy (slurm.allow_scheduler_queries=false)");
+        } else if (!slurmJobId) {
+          warnings.push("scheduler query skipped: missing slurm_job_id");
+        } else {
+          const queried = await slurmScheduler.query(slurmJobId);
+          warnings.push(...queried.warnings);
+          if (queried.info) {
+            schedulerInfo = {
+              source: queried.info.source,
+              state_raw: queried.info.stateRaw,
+              exit_code: queried.info.exitCode
+            };
+            schedulerNormalized = queried.info.normalizedState;
+            source = queried.info.source === "sacct" ? "workspace+sacct" : "workspace+squeue";
+          } else {
+            warnings.push("scheduler query skipped: no scheduler state available");
+          }
+        }
+
+        const outputs = await deps.store.listRunOutputs(targetRunId);
+        const artifactsByRole: Record<string, string> = {};
+        const roleSeen = new Set<string>();
+        for (const o of outputs) {
+          if (roleSeen.has(o.role)) {
+            warnings.push(`multiple artifacts linked for role=${o.role}; using first`);
+            continue;
+          }
+          roleSeen.add(o.role);
+          artifactsByRole[o.role] = o.artifactId;
+        }
+
+        const dbStatus = targetRun.status;
+        const dbExitCode = targetRun.exitCode ?? null;
+        const dbFinishedAt = targetRun.finishedAt ?? null;
+
+        let state: "queued" | "running" | "succeeded" | "failed" | "blocked" | "unknown" = "unknown";
+        let exitCode: number | null = null;
+
+        if (workspaceExitCode !== null) {
+          exitCode = workspaceExitCode;
+          state = workspaceExitCode === 0 ? "succeeded" : "failed";
+        } else if (schedulerNormalized && schedulerNormalized !== "unknown") {
+          if (schedulerInfo && schedulerInfo.exit_code !== null) exitCode = schedulerInfo.exit_code;
+          if (schedulerNormalized === "queued") state = "queued";
+          else if (schedulerNormalized === "running") state = "running";
+          else if (schedulerNormalized === "succeeded") state = "succeeded";
+          else if (schedulerNormalized === "failed") state = "failed";
+        } else if (dbStatus === "queued" || dbStatus === "running" || dbStatus === "succeeded" || dbStatus === "failed" || dbStatus === "blocked") {
+          state = dbStatus;
+          exitCode = dbExitCode;
+        }
+
+        const canonicalParams: JsonObject = {
+          target_run_id: targetRunId,
+          observation: {
+            slurm_job_id: slurmJobId,
+            state,
+            exit_code: exitCode,
+            source,
+            db: { status: dbStatus, exit_code: dbExitCode, finished_at: dbFinishedAt },
+            workspace: {
+              has_stdout: hasStdout,
+              has_stderr: hasStderr,
+              has_exit_code: workspaceExitCode !== null,
+              exit_code: workspaceExitCode
+            },
+            scheduler: schedulerInfo
+              ? { source: schedulerInfo.source, state_raw: schedulerInfo.state_raw, exit_code: schedulerInfo.exit_code }
+              : null,
+            artifacts_by_role: artifactsByRole
+          }
+        };
+
+        const { runId, paramsHash } = deriveRunId({
+          toolName,
+          contractVersion,
+          policyHash: deps.policy.policyHash,
+          canonicalParams
+        });
+
+        const existing = await deps.store.getRun(runId);
+        if (existing?.status === "succeeded" && existing.resultJson) {
+          return {
+            content: [{ type: "text", text: `Replayed ${toolName} (${runId})` }],
+            structuredContent: existing.resultJson
+          };
+        }
+
+        toolRun = new ToolRun(
+          { store: deps.store, artifacts: deps.artifacts },
+          {
+            runId,
+            projectId: targetRun.projectId,
+            toolName,
+            contractVersion,
+            toolVersion: "v1",
+            paramsHash,
+            canonicalParams,
+            policyHash: deps.policy.policyHash,
+            requestedBy: requestedByFromExtra(extra),
+            policySnapshot: deps.policy.snapshot() as JsonObject,
+            environment: envSnapshot()
+          }
+        );
+
+        await toolRun.start();
+        started = true;
+
+        const structured = await toolRun.finishSuccess(
+          {
+            target_run_id: targetRunId,
+            slurm_job_id: slurmJobId,
+            source,
+            warnings,
+            state,
+            exit_code: exitCode,
+            artifacts_by_role: artifactsByRole,
+            db: { status: dbStatus, exit_code: dbExitCode, finished_at: dbFinishedAt },
+            workspace: {
+              has_stdout: hasStdout,
+              has_stderr: hasStderr,
+              has_exit_code: workspaceExitCode !== null,
+              exit_code: workspaceExitCode
+            },
+            scheduler: schedulerInfo
+              ? { source: schedulerInfo.source, state_raw: schedulerInfo.state_raw, exit_code: schedulerInfo.exit_code }
+              : null
+          },
+          "slurm job get ok"
+        );
+
+        return {
+          content: [{ type: "text", text: `slurm job state: ${state}` }],
           structuredContent: structured
         };
       } catch (e) {

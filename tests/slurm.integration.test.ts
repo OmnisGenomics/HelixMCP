@@ -19,6 +19,7 @@ import { PolicyEngine, type PolicyConfig } from "../src/policy/policy.js";
 import { createGatewayServer } from "../src/mcp/gatewayServer.js";
 import { newProjectId } from "../src/core/ids.js";
 import { DefaultExecutionService } from "../src/execution/executionService.js";
+import type { SlurmScheduler } from "../src/execution/slurm/scheduler.js";
 
 const APPTAINER_SAMTOOLS_IMAGE =
   "docker://quay.io/biocontainers/samtools@sha256:bf80e07e650becfd084db1abde0fe932b50f990a07fa56421ea647b552b5a406";
@@ -32,6 +33,8 @@ describe.sequential("slurm (stubbed)", () => {
   let serverTransport: InMemoryTransport;
   let clientTransport: InMemoryTransport;
   let submitCalls = 0;
+  let schedulerCalls = 0;
+  let schedulerMode: "unavailable" | "running" = "running";
 
   beforeAll(async () => {
     tmpDir = await mkdtemp(path.join(os.tmpdir(), "helixmcp-slurm-"));
@@ -50,7 +53,7 @@ describe.sequential("slurm (stubbed)", () => {
     const policyConfig: PolicyConfig = {
       version: 1,
       runtime: { instance_id: "test" },
-      tool_allowlist: ["artifact_import", "artifact_get", "slurm_submit", "slurm_job_collect"],
+      tool_allowlist: ["artifact_import", "artifact_get", "slurm_submit", "slurm_job_get", "slurm_job_collect"],
       quotas: {
         max_threads: 16,
         max_runtime_seconds: 3600,
@@ -72,6 +75,7 @@ describe.sequential("slurm (stubbed)", () => {
         accounts_allowlist: ["bio"],
         qos_allowlist: [],
         constraints_allowlist: [],
+        allow_scheduler_queries: true,
         max_time_limit_seconds: 7200,
         max_cpus: 32,
         max_mem_mb: 262144,
@@ -88,6 +92,18 @@ describe.sequential("slurm (stubbed)", () => {
     const policy = new PolicyEngine(policyConfig);
 
     const execution = new DefaultExecutionService({ policy });
+    const slurmScheduler: SlurmScheduler = {
+      query: async (_jobId: string) => {
+        schedulerCalls += 1;
+        if (schedulerMode === "unavailable") {
+          return { info: null, warnings: ["sacct unavailable: fake"] };
+        }
+        return {
+          info: { source: "squeue", stateRaw: "RUNNING", normalizedState: "running", exitCode: null },
+          warnings: []
+        };
+      }
+    };
     const server = createGatewayServer({
       policy,
       store,
@@ -99,7 +115,8 @@ describe.sequential("slurm (stubbed)", () => {
           submitCalls += 1;
           return { slurmJobId: "12345", stdout: "12345\n", stderr: "" };
         }
-      }
+      },
+      slurmScheduler
     });
 
     [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -183,6 +200,33 @@ describe.sequential("slurm (stubbed)", () => {
     expect(targetRun?.status).toBe("queued");
     expect(targetRun?.finishedAt).toBeNull();
 
+    schedulerMode = "unavailable";
+    const get1 = await client.request(
+      { method: "tools/call", params: { name: "slurm_job_get", arguments: { run_id: targetRunId } } },
+      CallToolResultSchema
+    );
+    if (get1.isError) {
+      throw new Error(`slurm_job_get failed: ${get1.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`);
+    }
+    const getSc1 = get1.structuredContent as any;
+    expect(getSc1.target_run_id).toBe(targetRunId);
+    expect(getSc1.source).toBe("workspace_only");
+    expect(getSc1.warnings.join("\n")).toContain("sacct unavailable");
+    expect(getSc1.state).toBe("queued");
+
+    schedulerMode = "running";
+    const get2 = await client.request(
+      { method: "tools/call", params: { name: "slurm_job_get", arguments: { run_id: targetRunId } } },
+      CallToolResultSchema
+    );
+    if (get2.isError) {
+      throw new Error(`slurm_job_get failed: ${get2.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`);
+    }
+    const getSc2 = get2.structuredContent as any;
+    expect(getSc2.target_run_id).toBe(targetRunId);
+    expect(getSc2.source).toBe("workspace+squeue");
+    expect(getSc2.state).toBe("running");
+
     const materialized = await readFile(path.join(runsDir, targetRunId, "in", "input.bam"), "utf8");
     expect(materialized).toBe("FAKEBAM\n");
 
@@ -190,6 +234,18 @@ describe.sequential("slurm (stubbed)", () => {
     await writeFile(path.join(runsDir, targetRunId, "meta", "stdout.txt"), "ok\n", "utf8");
     await writeFile(path.join(runsDir, targetRunId, "meta", "stderr.txt"), "", "utf8");
     await writeFile(path.join(runsDir, targetRunId, "meta", "exit_code.txt"), "0\n", "utf8");
+
+    const get3 = await client.request(
+      { method: "tools/call", params: { name: "slurm_job_get", arguments: { run_id: targetRunId } } },
+      CallToolResultSchema
+    );
+    if (get3.isError) {
+      throw new Error(`slurm_job_get failed: ${get3.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`);
+    }
+    const getSc3 = get3.structuredContent as any;
+    expect(getSc3.target_run_id).toBe(targetRunId);
+    expect(getSc3.state).toBe("succeeded");
+    expect(getSc3.exit_code).toBe(0);
 
     const collect1 = await client.request(
       { method: "tools/call", params: { name: "slurm_job_collect", arguments: { run_id: targetRunId } } },

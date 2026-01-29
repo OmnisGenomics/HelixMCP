@@ -275,3 +275,39 @@ export const zSamtoolsFlagstatInputV2 = zSamtoolsFlagstatInput.extend({
 });
 
 export const zSamtoolsFlagstatOutputV2 = z.union([zSamtoolsFlagstatOutput, zSlurmSubmitOutput]);
+
+export const zSlurmJobGetInput = z.object({
+  run_id: zRunId
+});
+
+export const zJobGetSource = z.enum(["workspace_only", "workspace+sacct", "workspace+squeue"]);
+export const zRunState = z.enum(["queued", "running", "succeeded", "failed", "blocked", "unknown"]);
+
+export const zSlurmJobGetOutput = zProvenance.extend({
+  target_run_id: zRunId,
+  slurm_job_id: z.string().min(1).max(64).nullable(),
+  source: zJobGetSource,
+  warnings: z.array(z.string()),
+  state: zRunState,
+  exit_code: z.number().int().nullable(),
+  artifacts_by_role: z.record(z.string(), zArtifactId),
+  db: z.object({
+    status: zRunState,
+    exit_code: z.number().int().nullable(),
+    finished_at: z.string().nullable()
+  }),
+  workspace: z.object({
+    has_stdout: z.boolean(),
+    has_stderr: z.boolean(),
+    has_exit_code: z.boolean(),
+    exit_code: z.number().int().nullable()
+  }),
+  scheduler: z
+    .object({
+      source: z.enum(["sacct", "squeue"]).nullable(),
+      state_raw: z.string().nullable(),
+      exit_code: z.number().int().nullable()
+    })
+    .nullable(),
+  log_artifact_id: zArtifactId
+});
