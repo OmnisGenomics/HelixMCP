@@ -1,3 +1,12 @@
+# HelixMCP v0.7.0
+
+This release adds hybrid toolpacks: a single tool can run on Docker or submit a Slurm job while preserving deterministic identity, policy-gated execution, and replay semantics.
+
+What is included:
+- Hybrid toolpack support (`ToolDefinition.planKind="hybrid"` with per-run `selectedPlanKind`)
+- `samtools_flagstat` contract v2: adds `backend: "docker" | "slurm"` (policy default supported)
+- GitHub Actions CI workflow (typecheck + tests) to support branch protection
+
 # HelixMCP v0.6.1
 
 This is a small documentation polish release.
