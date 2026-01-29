@@ -82,21 +82,22 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
   const slurmSubmitter = deps.slurmSubmitter ?? new SbatchSubmitter();
   const slurmScheduler = deps.slurmScheduler ?? new SystemSlurmScheduler();
 
-  const ARTIFACT_TYPE_SET = new Set<ArtifactType>([
-    "FASTQ_GZ",
-    "BAM",
-    "BAI",
-    "VCF",
-    "H5AD",
-    "TSV",
-    "CSV",
-    "JSON",
-    "TEXT",
-    "HTML",
-    "PDF",
-    "LOG",
-    "UNKNOWN"
-  ]);
+	  const ARTIFACT_TYPE_SET = new Set<ArtifactType>([
+	    "FASTQ_GZ",
+	    "BAM",
+	    "BAI",
+	    "VCF",
+	    "H5AD",
+	    "TSV",
+	    "CSV",
+	    "JSON",
+	    "ZIP",
+	    "TEXT",
+	    "HTML",
+	    "PDF",
+	    "LOG",
+	    "UNKNOWN"
+	  ]);
 
   function requireArtifactType(value: string): ArtifactType {
     if (ARTIFACT_TYPE_SET.has(value as ArtifactType)) return value as ArtifactType;

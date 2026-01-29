@@ -39,6 +39,7 @@
         "TSV",
         "CSV",
         "JSON",
+        "ZIP",
         "TEXT",
         "HTML",
         "PDF",
@@ -48,4 +49,3 @@
     }
   }
 }
-

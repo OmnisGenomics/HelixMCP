@@ -16,6 +16,7 @@ export const zArtifactType = z.enum([
   "TSV",
   "CSV",
   "JSON",
+  "ZIP",
   "TEXT",
   "HTML",
   "PDF",
@@ -269,6 +270,47 @@ export const zSlurmJobCollectOutput = zProvenance.extend({
 });
 
 export const zBackend = z.enum(["docker", "slurm"]);
+
+export const zFastqcInput = z.object({
+  project_id: zProjectId,
+  reads_artifact_id: zArtifactId,
+  backend: zBackend.optional(),
+  threads: z.number().int().min(1).max(64).default(2)
+});
+
+export const zFastqcOutputDocker = zProvenance.extend({
+  fastqc_html_artifact_id: zArtifactId,
+  fastqc_zip_artifact_id: zArtifactId,
+  metrics: z.object({
+    pass: z.number().int(),
+    warn: z.number().int(),
+    fail: z.number().int(),
+    modules: z.record(z.string(), z.enum(["PASS", "WARN", "FAIL"])),
+    raw_lines: z.array(z.string())
+  }),
+  log_artifact_id: zArtifactId
+});
+
+export const zFastqcOutputV1 = z.union([zFastqcOutputDocker, zSlurmSubmitOutput]);
+
+export const zMultiqcInput = z.object({
+  project_id: zProjectId,
+  fastqc_zip_artifact_ids: z.array(zArtifactId).min(1).max(1000),
+  backend: zBackend.optional(),
+  threads: z.number().int().min(1).max(64).default(2)
+});
+
+export const zMultiqcOutputDocker = zProvenance.extend({
+  multiqc_html_artifact_id: zArtifactId,
+  multiqc_data_zip_artifact_id: zArtifactId,
+  metrics: z.object({
+    samples: z.number().int().nullable(),
+    raw_general_stats_lines: z.array(z.string()).nullable()
+  }),
+  log_artifact_id: zArtifactId
+});
+
+export const zMultiqcOutputV1 = z.union([zMultiqcOutputDocker, zSlurmSubmitOutput]);
 
 export const zSamtoolsFlagstatInputV2 = zSamtoolsFlagstatInput.extend({
   backend: zBackend.optional()

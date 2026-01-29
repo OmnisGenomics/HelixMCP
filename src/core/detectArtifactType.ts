@@ -10,10 +10,10 @@ export function detectArtifactType(filenameOrLabel: string): ArtifactType {
   if (s.endsWith(".tsv")) return "TSV";
   if (s.endsWith(".csv")) return "CSV";
   if (s.endsWith(".json")) return "JSON";
+  if (s.endsWith(".zip")) return "ZIP";
   if (s.endsWith(".html") || s.endsWith(".htm")) return "HTML";
   if (s.endsWith(".pdf")) return "PDF";
   if (s.endsWith(".log")) return "LOG";
   if (s.endsWith(".txt")) return "TEXT";
   return "UNKNOWN";
 }
-

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:multiqc:v1",
+  "title": "multiqc input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project_id", "fastqc_zip_artifact_ids"],
+  "properties": {
+    "project_id": { "$ref": "helixmcp:common#/$defs/ProjectId" },
+    "fastqc_zip_artifact_ids": {
+      "type": "array",
+      "items": { "$ref": "helixmcp:common#/$defs/ArtifactId" },
+      "minItems": 1,
+      "maxItems": 1000
+    },
+    "backend": { "type": "string", "enum": ["docker", "slurm"] },
+    "threads": { "type": "integer", "minimum": 1, "maximum": 64, "default": 2 }
+  }
+}
+

@@ -119,6 +119,10 @@ export class PolicyEngine {
     return trimmed.length > 0 ? trimmed : null;
   }
 
+  hasSlurmConfig(): boolean {
+    return typeof this.policy.slurm === "object" && this.policy.slurm !== null;
+  }
+
   defaultBackend(): "docker" | "slurm" {
     return this.policy.execution?.default_backend === "slurm" ? "slurm" : "docker";
   }

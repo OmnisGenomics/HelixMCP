@@ -10,6 +10,7 @@ export type ArtifactType =
   | "TSV"
   | "CSV"
   | "JSON"
+  | "ZIP"
   | "TEXT"
   | "HTML"
   | "PDF"

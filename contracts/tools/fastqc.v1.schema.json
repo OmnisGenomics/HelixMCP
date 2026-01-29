@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:fastqc:v1",
+  "title": "fastqc input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project_id", "reads_artifact_id"],
+  "properties": {
+    "project_id": { "$ref": "helixmcp:common#/$defs/ProjectId" },
+    "reads_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" },
+    "backend": { "type": "string", "enum": ["docker", "slurm"] },
+    "threads": { "type": "integer", "minimum": 1, "maximum": 64, "default": 2 }
+  }
+}
+

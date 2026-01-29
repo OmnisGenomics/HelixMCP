@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
 import { execSync, spawnSync } from "child_process";
+import { gzipSync } from "zlib";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -375,6 +376,111 @@ describe.sequential("gateway (in-memory)", () => {
       expect(count2).toBe(count1);
     },
     90_000
+  );
+
+  it.runIf(DOCKER_AVAILABLE)(
+    "runs fastqc + multiqc via docker and replays",
+    async () => {
+      const projectId = newProjectId();
+
+      const fastqText = ["@r1", "ACGT", "+", "!!!!", ""].join("\n");
+      const gzPath = path.join(tmpDir, "reads.fastq.gz");
+      await writeFile(gzPath, gzipSync(Buffer.from(fastqText, "utf8")));
+
+      const imported = await client.request(
+        {
+          method: "tools/call",
+          params: {
+            name: "artifact_import",
+            arguments: {
+              project_id: projectId,
+              type_hint: "FASTQ_GZ",
+              label: "reads.fastq.gz",
+              source: { kind: "local_path", path: gzPath }
+            }
+          }
+        },
+        CallToolResultSchema
+      );
+      if (imported.isError) {
+        throw new Error(
+          `artifact_import failed: ${imported.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+        );
+      }
+      const readsId = (imported.structuredContent as any).artifact.artifact_id as string;
+
+      const fastqc1 = await client.request(
+        {
+          method: "tools/call",
+          params: { name: "fastqc", arguments: { project_id: projectId, reads_artifact_id: readsId, backend: "docker" } }
+        },
+        CallToolResultSchema
+      );
+      if (fastqc1.isError) {
+        throw new Error(`fastqc failed: ${fastqc1.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`);
+      }
+      const f1 = fastqc1.structuredContent as any;
+      expect(f1.provenance_run_id).toMatch(/^run_/);
+      expect(f1.fastqc_html_artifact_id).toMatch(/^art_/);
+      expect(f1.fastqc_zip_artifact_id).toMatch(/^art_/);
+      expect(f1.metrics.pass).toBeTypeOf("number");
+      expect(f1.metrics.warn).toBeTypeOf("number");
+      expect(f1.metrics.fail).toBeTypeOf("number");
+
+      const fastqc2 = await client.request(
+        {
+          method: "tools/call",
+          params: { name: "fastqc", arguments: { project_id: projectId, reads_artifact_id: readsId, backend: "docker" } }
+        },
+        CallToolResultSchema
+      );
+      if (fastqc2.isError) {
+        throw new Error(`fastqc failed: ${fastqc2.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`);
+      }
+      const f2 = fastqc2.structuredContent as any;
+      expect((fastqc2.content[0] as any).text).toContain("Replayed");
+      expect(f2.provenance_run_id).toBe(f1.provenance_run_id);
+      expect(f2.fastqc_html_artifact_id).toBe(f1.fastqc_html_artifact_id);
+      expect(f2.fastqc_zip_artifact_id).toBe(f1.fastqc_zip_artifact_id);
+
+      const multiqc1 = await client.request(
+        {
+          method: "tools/call",
+          params: {
+            name: "multiqc",
+            arguments: { project_id: projectId, fastqc_zip_artifact_ids: [f1.fastqc_zip_artifact_id], backend: "docker" }
+          }
+        },
+        CallToolResultSchema
+      );
+      if (multiqc1.isError) {
+        throw new Error(`multiqc failed: ${multiqc1.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`);
+      }
+      const m1 = multiqc1.structuredContent as any;
+      expect(m1.provenance_run_id).toMatch(/^run_/);
+      expect(m1.multiqc_html_artifact_id).toMatch(/^art_/);
+      expect(m1.multiqc_data_zip_artifact_id).toMatch(/^art_/);
+
+      const multiqc2 = await client.request(
+        {
+          method: "tools/call",
+          params: {
+            name: "multiqc",
+            arguments: { project_id: projectId, fastqc_zip_artifact_ids: [f1.fastqc_zip_artifact_id], backend: "docker" }
+          }
+        },
+        CallToolResultSchema
+      );
+      if (multiqc2.isError) {
+        throw new Error(`multiqc failed: ${multiqc2.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`);
+      }
+      const m2 = multiqc2.structuredContent as any;
+      expect((multiqc2.content[0] as any).text).toContain("Replayed");
+      expect(m2.provenance_run_id).toBe(m1.provenance_run_id);
+      expect(m2.multiqc_html_artifact_id).toBe(m1.multiqc_html_artifact_id);
+      expect(m2.multiqc_data_zip_artifact_id).toBe(m1.multiqc_data_zip_artifact_id);
+    },
+    180_000
   );
 
   it.runIf(DOCKER_AVAILABLE)(

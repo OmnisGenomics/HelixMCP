@@ -21,6 +21,7 @@ import { PolicyEngine } from "../src/policy/policy.js";
 import { registerToolDefinitions } from "../src/toolpacks/register.js";
 import { deriveRunId } from "../src/runs/runIdentity.js";
 import { executeSlurmPlan, type SlurmExecutionPlan } from "../src/toolpacks/slurm/executeSlurm.js";
+import { multiqcTool } from "../src/toolpacks/builtin/multiqc.js";
 
 describe("toolpacks", () => {
   it("fails closed on invalid tool definitions", () => {
@@ -754,6 +755,101 @@ describe("toolpacks", () => {
     } finally {
       if (clientTransport) await clientTransport.close();
       if (serverTransport) await serverTransport.close();
+      if (pool) await pool.end();
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("multiqc run_id is deterministic across input order", async () => {
+    const tmpDir = await mkdtemp(path.join(os.tmpdir(), "helixmcp-toolpacks-"));
+    let pool: pg.Pool | null = null;
+
+    try {
+      const mem = newDb({ autoCreateForeignKeyIndices: true });
+      const adapter = mem.adapters.createPg();
+      pool = new adapter.Pool() as unknown as pg.Pool;
+      await applySqlFile(pool, path.resolve("db/schema.sql"));
+
+      const db = createDb(pool);
+      const store = new PostgresStore(db);
+      const objects = new LocalObjectStore(path.join(tmpDir, "objects"));
+      const artifacts = new ArtifactService(store, objects);
+      const runsDir = path.join(tmpDir, "runs");
+
+      const policy = new PolicyEngine({
+        version: 1,
+        runtime: { instance_id: "local" },
+        tool_allowlist: ["multiqc"],
+        quotas: { max_threads: 8, max_runtime_seconds: 60, max_import_bytes: 1024 * 1024 },
+        imports: { allow_source_kinds: ["inline_text"], local_path_prefix_allowlist: [], deny_symlinks: true },
+        docker: {
+          network_mode: "none",
+          image_allowlist: ["quay.io/biocontainers/multiqc@sha256:ecafca93ba3346775b773bbfd6ff920ecfc259f554777576c15d3139c678311b"]
+        }
+      });
+
+      const projectId = "proj_01HZZZZZZZZZZZZZZZZZZZZZZZ";
+      const a = await artifacts.importArtifact({
+        projectId: projectId as any,
+        source: { kind: "inline_text", text: "zip-a\n" },
+        typeHint: "ZIP",
+        label: "a.zip",
+        createdByRunId: null,
+        maxBytes: null
+      });
+      const b = await artifacts.importArtifact({
+        projectId: projectId as any,
+        source: { kind: "inline_text", text: "zip-b\n" },
+        typeHint: "ZIP",
+        label: "b.zip",
+        createdByRunId: null,
+        maxBytes: null
+      });
+      const c = await artifacts.importArtifact({
+        projectId: projectId as any,
+        source: { kind: "inline_text", text: "zip-c\n" },
+        typeHint: "ZIP",
+        label: "c.zip",
+        createdByRunId: null,
+        maxBytes: null
+      });
+
+      const ctx = { policy, store, artifacts, runsDir } as any;
+
+      const prep1 = await multiqcTool.canonicalize(
+        {
+          project_id: projectId,
+          fastqc_zip_artifact_ids: [a.artifactId, b.artifactId, c.artifactId],
+          backend: "docker",
+          threads: 2
+        } as any,
+        ctx
+      );
+      const prep2 = await multiqcTool.canonicalize(
+        {
+          project_id: projectId,
+          fastqc_zip_artifact_ids: [c.artifactId, a.artifactId, b.artifactId],
+          backend: "docker",
+          threads: 2
+        } as any,
+        ctx
+      );
+
+      const r1 = deriveRunId({
+        toolName: multiqcTool.toolName,
+        contractVersion: multiqcTool.contractVersion,
+        policyHash: policy.policyHash,
+        canonicalParams: prep1.canonicalParams
+      });
+      const r2 = deriveRunId({
+        toolName: multiqcTool.toolName,
+        contractVersion: multiqcTool.contractVersion,
+        policyHash: policy.policyHash,
+        canonicalParams: prep2.canonicalParams
+      });
+
+      expect(r1.runId).toBe(r2.runId);
+    } finally {
       if (pool) await pool.end();
       await rm(tmpDir, { recursive: true, force: true });
     }

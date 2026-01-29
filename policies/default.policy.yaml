@@ -18,6 +18,8 @@ tool_allowlist:
   - simulate_align_reads
   - seqkit_stats
   - samtools_flagstat
+  - fastqc
+  - multiqc
   - export_nextflow
 
 quotas:
@@ -40,9 +42,15 @@ tools:
     max_threads: 16
   simulate_qc_fastq:
     max_threads: 8
+  fastqc:
+    max_threads: 4
+  multiqc:
+    max_threads: 8
 
 docker:
   network_mode: "none"
   image_allowlist:
     - "quay.io/biocontainers/seqkit@sha256:67c9a1cfeafbccfd43bbd1fbb80646c9faa06a50b22c8ea758c3c84268b6765d"
     - "quay.io/biocontainers/samtools@sha256:bf80e07e650becfd084db1abde0fe932b50f990a07fa56421ea647b552b5a406"
+    - "quay.io/biocontainers/fastqc@sha256:e194048df39c3145d9b4e0a14f4da20b59d59250465b6f2a9cb698445fd45900"
+    - "quay.io/biocontainers/multiqc@sha256:ecafca93ba3346775b773bbfd6ff920ecfc259f554777576c15d3139c678311b"

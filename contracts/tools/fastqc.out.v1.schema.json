@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:fastqc:out:v1",
+  "title": "fastqc output",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provenance_run_id",
+        "fastqc_html_artifact_id",
+        "fastqc_zip_artifact_id",
+        "metrics",
+        "log_artifact_id"
+      ],
+      "properties": {
+        "provenance_run_id": { "$ref": "helixmcp:common#/$defs/RunId" },
+        "fastqc_html_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" },
+        "fastqc_zip_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["pass", "warn", "fail", "modules", "raw_lines"],
+          "properties": {
+            "pass": { "type": "integer", "minimum": 0 },
+            "warn": { "type": "integer", "minimum": 0 },
+            "fail": { "type": "integer", "minimum": 0 },
+            "modules": {
+              "type": "object",
+              "additionalProperties": { "type": "string", "enum": ["PASS", "WARN", "FAIL"] }
+            },
+            "raw_lines": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "log_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" }
+      }
+    },
+    { "$ref": "helixmcp:tool:slurm_submit:out:v1" }
+  ]
+}
+
