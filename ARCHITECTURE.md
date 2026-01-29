@@ -59,6 +59,7 @@ Notes:
 - Docker tools typically start `running` and finish terminal in one gateway call.
 - Slurm submission creates a `queued` run (submitted) and `slurm_job_collect` finalizes it terminal based on `meta/exit_code.txt`.
 - The database layer fail-closed enforces status transitions to prevent accidental invariant drift.
+- Toolpack ABI v1 is frozen in v0.9; see `TOOLPACK_ABI_V1.md`.
 
 ## Execution boundary (policy before work runs)
 
