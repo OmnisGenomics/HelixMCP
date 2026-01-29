@@ -95,7 +95,13 @@ describe("toolpacks", () => {
             projectId: args.project_id,
             canonicalParams: { project_id: args.project_id, stable: true },
             toolVersion: "v1",
-            plan: {},
+            plan: {
+              image: "example.com/dummy@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              argv: ["true"],
+              workdir: "/work",
+              inputs: [],
+              resources: { threads: 1, runtimeSeconds: 10 }
+            },
             inputsToLink: []
           };
         },
@@ -137,4 +143,3 @@ describe("toolpacks", () => {
     }
   });
 });
-

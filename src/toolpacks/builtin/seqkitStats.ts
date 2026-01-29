@@ -55,14 +55,7 @@ function parseSeqkitStatsTsv(tsv: string): { metrics: JsonObject; raw: string } 
 
 type Args = typeof zSeqkitStatsInput._output;
 
-interface ExecPlan {
-  threads: number;
-  runtimeSeconds: number;
-  input: ArtifactRecord;
-  docker: DockerExecutionPlan;
-}
-
-export const seqkitStatsTool: ToolDefinition<Args, ExecPlan> = {
+export const seqkitStatsTool: ToolDefinition<Args, DockerExecutionPlan> = {
   toolName: "seqkit_stats",
   contractVersion: "v1",
   planKind: "docker",
@@ -71,7 +64,7 @@ export const seqkitStatsTool: ToolDefinition<Args, ExecPlan> = {
   outputSchema: zSeqkitStatsOutput,
   declaredOutputs: [{ role: "report", type: "TSV", label: "seqkit_stats.tsv" }],
 
-  async canonicalize(args: Args, ctx: ToolContext): Promise<PreparedToolRun<ExecPlan>> {
+  async canonicalize(args: Args, ctx: ToolContext): Promise<PreparedToolRun<DockerExecutionPlan>> {
     const projectId = args.project_id as ProjectId;
     const threads = ctx.policy.enforceThreads("seqkit_stats", args.threads);
     const runtimeSeconds = ctx.policy.maxRuntimeSeconds();
@@ -103,12 +96,6 @@ export const seqkitStatsTool: ToolDefinition<Args, ExecPlan> = {
       image: SEQKIT_IMAGE,
       argv: ["seqkit", "stats", "-T", "/work/in/input"],
       workdir: "/work",
-      env: {
-        OMP_NUM_THREADS: String(threads),
-        OPENBLAS_NUM_THREADS: String(threads),
-        MKL_NUM_THREADS: String(threads),
-        NUMEXPR_NUM_THREADS: String(threads)
-      },
       inputs: [{ role: "input", artifact: input, destName: "input" }],
       resources: { threads, runtimeSeconds }
     };
@@ -117,7 +104,7 @@ export const seqkitStatsTool: ToolDefinition<Args, ExecPlan> = {
       projectId,
       canonicalParams,
       toolVersion: SEQKIT_IMAGE,
-      plan: { threads, runtimeSeconds, input, docker },
+      plan: docker,
       inputsToLink: [{ artifactId: input.artifactId, role: "input" }]
     };
   },
@@ -125,7 +112,7 @@ export const seqkitStatsTool: ToolDefinition<Args, ExecPlan> = {
   async run(args: {
     runId: RunId;
     toolRun: ToolRun;
-    prepared: PreparedToolRun<ExecPlan>;
+    prepared: PreparedToolRun<DockerExecutionPlan>;
     ctx: ToolContext;
   }): Promise<ToolExecutionResult> {
     const { runId, toolRun, prepared, ctx } = args;
@@ -137,7 +124,7 @@ export const seqkitStatsTool: ToolDefinition<Args, ExecPlan> = {
       runsDir: ctx.runsDir,
       runId,
       toolName: "seqkit_stats",
-      plan: prepared.plan.docker,
+      plan: prepared.plan,
       materializeToPath: async (artifactId: string, destPath: string) => ctx.artifacts.materializeToPath(artifactId as any, destPath)
     });
 

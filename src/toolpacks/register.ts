@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import type { JsonObject } from "../core/json.js";
 import type { ProjectId } from "../core/ids.js";
+import { stableJsonStringify } from "../core/canonicalJson.js";
 import { deriveRunId } from "../runs/runIdentity.js";
 import { requestedByFromExtra, ToolRun } from "../runs/toolRun.js";
 import { envSnapshot } from "../mcp/envSnapshot.js";
@@ -147,6 +148,89 @@ async function assertDeclaredOutputsSatisfied(ctx: ToolContext, tool: ToolDefini
   }
 }
 
+function canonicalizeToolpackCanonicalParams(input: JsonObject, context: string): JsonObject {
+  const canonicalJson = stableJsonStringify(input);
+  const parsed = JSON.parse(canonicalJson) as unknown;
+
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`${context}: canonicalParams must be a JSON object`);
+  }
+
+  return parsed as JsonObject;
+}
+
+function assertDockerPlanInputsMatchLinkedInputs(toolName: string, prepared: { plan: unknown; inputsToLink: unknown }): void {
+  const plan = prepared.plan as any;
+  if (!plan || typeof plan !== "object") {
+    throw new Error(`toolpack:${toolName}: docker plan must be an object`);
+  }
+
+  const planInputs = plan.inputs as unknown;
+  if (!Array.isArray(planInputs)) {
+    throw new Error(`toolpack:${toolName}: docker plan.inputs must be an array`);
+  }
+
+  const linked = prepared.inputsToLink as any;
+  if (!Array.isArray(linked)) {
+    throw new Error(`toolpack:${toolName}: inputsToLink must be an array`);
+  }
+
+  const planKeys = new Set<string>();
+  for (const inp of planInputs) {
+    const role = inp?.role;
+    const artifactId = inp?.artifact?.artifactId;
+    if (typeof role !== "string" || role.trim().length === 0) {
+      throw new Error(`toolpack:${toolName}: docker plan.inputs role must be a string`);
+    }
+    if (typeof artifactId !== "string" || artifactId.trim().length === 0) {
+      throw new Error(`toolpack:${toolName}: docker plan.inputs artifactId must be a string`);
+    }
+    const key = `${role}\u0000${artifactId}`;
+    if (planKeys.has(key)) {
+      throw new Error(`toolpack:${toolName}: docker plan.inputs contains duplicate role+artifact: ${role} ${artifactId}`);
+    }
+    planKeys.add(key);
+  }
+
+  const linkedKeys = new Set<string>();
+  for (const inp of linked) {
+    const role = inp?.role;
+    const artifactId = inp?.artifactId;
+    if (typeof role !== "string" || role.trim().length === 0) {
+      throw new Error(`toolpack:${toolName}: inputsToLink role must be a string`);
+    }
+    if (typeof artifactId !== "string" || artifactId.trim().length === 0) {
+      throw new Error(`toolpack:${toolName}: inputsToLink artifactId must be a string`);
+    }
+    const key = `${role}\u0000${artifactId}`;
+    if (linkedKeys.has(key)) {
+      throw new Error(`toolpack:${toolName}: inputsToLink contains duplicate role+artifact: ${role} ${artifactId}`);
+    }
+    linkedKeys.add(key);
+  }
+
+  const missing: string[] = [];
+  for (const k of linkedKeys) {
+    if (!planKeys.has(k)) missing.push(k);
+  }
+  const extra: string[] = [];
+  for (const k of planKeys) {
+    if (!linkedKeys.has(k)) extra.push(k);
+  }
+
+  if (missing.length || extra.length) {
+    const fmt = (k: string): string => {
+      const [role, artifactId] = k.split("\u0000");
+      return `${role} ${artifactId}`;
+    };
+    throw new Error(
+      `toolpack:${toolName}: docker plan inputs must exactly match inputsToLink` +
+        (missing.length ? ` (missing: ${missing.slice(0, 5).map(fmt).join(", ")})` : "") +
+        (extra.length ? ` (extra: ${extra.slice(0, 5).map(fmt).join(", ")})` : "")
+    );
+  }
+}
+
 export function registerToolDefinitions(mcp: McpServer, ctx: ToolContext, tools: Array<ToolDefinition<any, any>>): void {
   // Fail closed: refuse to start if any toolpack is structurally invalid.
   validateToolDefinitions(tools);
@@ -170,6 +254,7 @@ export function registerToolDefinitions(mcp: McpServer, ctx: ToolContext, tools:
 
           const prepared = await tool.canonicalize(args, ctx);
           assertJsonSafe(prepared.canonicalParams, `toolpack:${toolName}: canonicalParams`);
+          prepared.canonicalParams = canonicalizeToolpackCanonicalParams(prepared.canonicalParams, `toolpack:${toolName}: canonicalParams`);
 
           const { runId, paramsHash } = deriveRunId({
             toolName,
@@ -208,6 +293,10 @@ export function registerToolDefinitions(mcp: McpServer, ctx: ToolContext, tools:
 
           for (const inp of prepared.inputsToLink) {
             await toolRun.linkInput(inp.artifactId, inp.role);
+          }
+
+          if (tool.planKind === "docker") {
+            assertDockerPlanInputsMatchLinkedInputs(toolName, prepared);
           }
 
           const res = await tool.run({ runId, toolRun, prepared, ctx });

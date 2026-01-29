@@ -100,13 +100,7 @@ function parseSamtoolsFlagstat(stdout: string): {
 
 type Args = typeof zSamtoolsFlagstatInput._output;
 
-interface ExecPlan {
-  runtimeSeconds: number;
-  bam: ArtifactRecord;
-  docker: DockerExecutionPlan;
-}
-
-export const samtoolsFlagstatTool: ToolDefinition<Args, ExecPlan> = {
+export const samtoolsFlagstatTool: ToolDefinition<Args, DockerExecutionPlan> = {
   toolName: "samtools_flagstat",
   contractVersion: "v1",
   planKind: "docker",
@@ -115,7 +109,7 @@ export const samtoolsFlagstatTool: ToolDefinition<Args, ExecPlan> = {
   outputSchema: zSamtoolsFlagstatOutput,
   declaredOutputs: [{ role: "report", type: "TEXT", label: "samtools_flagstat.txt" }],
 
-  async canonicalize(args: Args, ctx: ToolContext): Promise<PreparedToolRun<ExecPlan>> {
+  async canonicalize(args: Args, ctx: ToolContext): Promise<PreparedToolRun<DockerExecutionPlan>> {
     const projectId = args.project_id as ProjectId;
     const threads = ctx.policy.enforceThreads("samtools_flagstat", 1);
     const runtimeSeconds = ctx.policy.maxRuntimeSeconds();
@@ -158,7 +152,7 @@ export const samtoolsFlagstatTool: ToolDefinition<Args, ExecPlan> = {
       projectId,
       canonicalParams,
       toolVersion: SAMTOOLS_IMAGE,
-      plan: { runtimeSeconds, bam, docker },
+      plan: docker,
       inputsToLink: [{ artifactId: bam.artifactId, role: "bam" }]
     };
   },
@@ -166,7 +160,7 @@ export const samtoolsFlagstatTool: ToolDefinition<Args, ExecPlan> = {
   async run(args: {
     runId: RunId;
     toolRun: ToolRun;
-    prepared: PreparedToolRun<ExecPlan>;
+    prepared: PreparedToolRun<DockerExecutionPlan>;
     ctx: ToolContext;
   }): Promise<ToolExecutionResult> {
     const { runId, toolRun, prepared, ctx } = args;
@@ -178,7 +172,7 @@ export const samtoolsFlagstatTool: ToolDefinition<Args, ExecPlan> = {
       runsDir: ctx.runsDir,
       runId,
       toolName: "samtools_flagstat",
-      plan: prepared.plan.docker,
+      plan: prepared.plan,
       materializeToPath: async (artifactId: string, destPath: string) => ctx.artifacts.materializeToPath(artifactId as any, destPath)
     });
 
