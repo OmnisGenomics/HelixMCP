@@ -1,3 +1,14 @@
+# HelixMCP v0.6.0
+
+This release extends Toolpacks to the Slurm island: toolpacks can now submit deterministic Slurm plans (apptainer-only, network none) with replay semantics.
+
+What is included:
+- Slurm toolpack support (validators, queued checkpoint semantics, replay without resubmission)
+- Slurm plan IO equality enforced against declared outputs (role/type/label/srcRelpath)
+- Apptainer image must be `docker://...@sha256:...` (fail closed even if allowlisted)
+- Built-in Slurm toolpack: `samtools_flagstat_slurm`
+- Docker toolpack input hardening (trimmed roles, unique destName, no hidden IO)
+
 # HelixMCP v0.5.0
 
 This release introduces Toolpacks: a fail-closed, typed registry for scaling tools without turning the gateway into a “god file”.
