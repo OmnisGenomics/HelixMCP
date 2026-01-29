@@ -11,6 +11,8 @@ import type { ToolContext, ToolDefinition } from "./types.js";
 
 const TOOL_NAME_RE = /^[a-z][a-z0-9_]*$/;
 const CONTRACT_VERSION_RE = /^v\d+$/;
+const TOOLPACK_ABI_VERSION_RE = /^v\d+$/;
+const SUPPORTED_TOOLPACK_ABI_VERSIONS = new Set(["v1"]);
 const RESERVED_OUTPUT_ROLES = new Set(["log", "stdout", "stderr", "slurm_script"]);
 
 const ARTIFACT_TYPES: Set<ArtifactType> = new Set<ArtifactType>([
@@ -82,6 +84,18 @@ function validateToolDefinitions(tools: Array<ToolDefinition<any, any>>): void {
       throw new Error(`toolpack: duplicate toolName: ${tool.toolName}`);
     }
     toolNames.add(tool.toolName);
+
+    if (!tool.abiVersion || typeof tool.abiVersion !== "string") {
+      throw new Error(`toolpack:${tool.toolName}: missing abiVersion`);
+    }
+    if (!TOOLPACK_ABI_VERSION_RE.test(tool.abiVersion)) {
+      throw new Error(`toolpack:${tool.toolName}: invalid abiVersion: ${tool.abiVersion}`);
+    }
+    if (!SUPPORTED_TOOLPACK_ABI_VERSIONS.has(tool.abiVersion)) {
+      throw new Error(
+        `toolpack:${tool.toolName}: unsupported abiVersion: ${tool.abiVersion} (supported: ${Array.from(SUPPORTED_TOOLPACK_ABI_VERSIONS).join(", ")})`
+      );
+    }
 
     if (!tool.contractVersion || typeof tool.contractVersion !== "string" || !CONTRACT_VERSION_RE.test(tool.contractVersion)) {
       throw new Error(`toolpack:${tool.toolName}: invalid contractVersion: ${tool.contractVersion}`);

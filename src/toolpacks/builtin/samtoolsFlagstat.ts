@@ -104,6 +104,7 @@ function parseSamtoolsFlagstat(stdout: string): {
 type Args = typeof zSamtoolsFlagstatInputV2._output;
 
 export const samtoolsFlagstatTool: ToolDefinition<Args, DockerExecutionPlan | SlurmExecutionPlan> = {
+  abiVersion: "v1",
   toolName: "samtools_flagstat",
   contractVersion: "v2",
   planKind: "hybrid",

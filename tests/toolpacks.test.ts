@@ -84,6 +84,7 @@ describe("toolpacks", () => {
       const mcp = new McpServer({ name: "helixmcp-test", version: "0.0.0" });
 
       const dummyTool = {
+        abiVersion: "v1",
         toolName: "dummy_tool",
         contractVersion: "v1",
         planKind: "docker" as const,
@@ -197,6 +198,7 @@ describe("toolpacks", () => {
       const mcp = new McpServer({ name: "helixmcp-test", version: "0.0.0" });
 
       const collisionTool = {
+        abiVersion: "v1",
         toolName: "collision_tool",
         contractVersion: "v1",
         planKind: "docker" as const,
@@ -326,6 +328,7 @@ describe("toolpacks", () => {
       const mcp = new McpServer({ name: "helixmcp-test", version: "0.0.0" });
 
       const slurmTool = {
+        abiVersion: "v1",
         toolName: "slurm_tool",
         contractVersion: "v1",
         planKind: "slurm" as const,
@@ -520,6 +523,7 @@ describe("toolpacks", () => {
       const mcp = new McpServer({ name: "helixmcp-test", version: "0.0.0" });
 
       const hybridTool = {
+        abiVersion: "v1",
         toolName: "hybrid_slurm_tool",
         contractVersion: "v1",
         planKind: "hybrid" as const,
@@ -681,6 +685,7 @@ describe("toolpacks", () => {
       const mcp = new McpServer({ name: "helixmcp-test", version: "0.0.0" });
 
       const mismatchTool = {
+        abiVersion: "v1",
         toolName: "mismatch_slurm_tool",
         contractVersion: "v1",
         planKind: "slurm" as const,

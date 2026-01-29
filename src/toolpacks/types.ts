@@ -19,6 +19,8 @@ export interface ToolContext {
 export type ToolPlanKind = "docker" | "slurm" | "hybrid";
 export type SelectedPlanKind = Exclude<ToolPlanKind, "hybrid">;
 
+export type ToolpackAbiVersion = "v1";
+
 export interface ToolDeclaredOutput {
   role: string;
   type: ArtifactType;
@@ -43,6 +45,7 @@ export interface PreparedToolRun<TPlan> {
 }
 
 export interface ToolDefinition<TArgs, TPlan> {
+  abiVersion: ToolpackAbiVersion;
   toolName: string;
   contractVersion: string;
   planKind: ToolPlanKind;

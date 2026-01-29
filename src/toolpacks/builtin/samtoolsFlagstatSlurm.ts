@@ -12,6 +12,7 @@ const SAMTOOLS_APPTAINER_IMAGE =
 type Args = typeof zSamtoolsFlagstatInput._output;
 
 export const samtoolsFlagstatSlurmTool: ToolDefinition<Args, SlurmExecutionPlan> = {
+  abiVersion: "v1",
   toolName: "samtools_flagstat_slurm",
   contractVersion: "v1",
   planKind: "slurm",

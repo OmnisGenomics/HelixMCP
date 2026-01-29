@@ -55,6 +55,7 @@ function parseSeqkitStatsTsv(tsv: string): { metrics: JsonObject; raw: string } 
 type Args = typeof zSeqkitStatsInput._output;
 
 export const seqkitStatsTool: ToolDefinition<Args, DockerExecutionPlan> = {
+  abiVersion: "v1",
   toolName: "seqkit_stats",
   contractVersion: "v1",
   planKind: "docker",
