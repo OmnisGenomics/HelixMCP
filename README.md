@@ -27,6 +27,7 @@ HELIXMCP_TEST_DOCKER=1 npm test
 ## Hybrid toolpack example (Docker or Slurm)
 
 - `samtools_flagstat` supports `backend: "docker" | "slurm"` (default via policy; falls back to `"docker"`).
+- This is the same tool contract and deterministic `run_id`, with the backend selecting the execution fabric (immediate Docker vs queued Slurm).
 - With `backend: "slurm"`, the tool checkpoints `queued` and returns a `run_id` plus Slurm metadata; use `slurm_job_collect` to ingest declared `out/` outputs as artifacts.
 - Set `execution.default_backend: "slurm"` in policy to make Slurm the default (requires `slurm` policy config).
 - For a cluster smoke test see `docs/slurm_cluster_smoke.md`.
