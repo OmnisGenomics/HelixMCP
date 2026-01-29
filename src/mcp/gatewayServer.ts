@@ -103,7 +103,7 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
 
   registerToolDefinitions(
     mcp,
-    { policy: deps.policy, store: deps.store, artifacts: deps.artifacts, runsDir: deps.runsDir },
+    { policy: deps.policy, store: deps.store, artifacts: deps.artifacts, runsDir: deps.runsDir, slurmSubmitter },
     builtinToolDefinitions
   );
 

@@ -6,12 +6,14 @@ import type { PolicyEngine } from "../policy/policy.js";
 import type { ToolRun } from "../runs/toolRun.js";
 import type { PostgresStore } from "../store/postgresStore.js";
 import type { ArtifactType } from "../core/artifact.js";
+import type { SlurmSubmitter } from "../execution/slurm/submitter.js";
 
 export interface ToolContext {
   policy: PolicyEngine;
   store: PostgresStore;
   artifacts: ArtifactService;
   runsDir: string;
+  slurmSubmitter?: SlurmSubmitter;
 }
 
 export type ToolPlanKind = "docker" | "slurm";
@@ -20,6 +22,9 @@ export interface ToolDeclaredOutput {
   role: string;
   type: ArtifactType;
   label: string;
+  // For slurm toolpacks: relative path under the run workspace where the output will be collected from.
+  // Example: "out/report.txt"
+  srcRelpath?: string;
 }
 
 export interface ToolExecutionResult {
