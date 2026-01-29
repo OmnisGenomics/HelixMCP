@@ -11,6 +11,7 @@ export function detectArtifactType(filenameOrLabel: string): ArtifactType {
   if (s.endsWith(".csv")) return "CSV";
   if (s.endsWith(".json")) return "JSON";
   if (s.endsWith(".zip")) return "ZIP";
+  if (s.endsWith(".md") || s.endsWith(".markdown")) return "MD";
   if (s.endsWith(".html") || s.endsWith(".htm")) return "HTML";
   if (s.endsWith(".pdf")) return "PDF";
   if (s.endsWith(".log")) return "LOG";

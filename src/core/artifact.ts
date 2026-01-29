@@ -11,6 +11,7 @@ export type ArtifactType =
   | "CSV"
   | "JSON"
   | "ZIP"
+  | "MD"
   | "TEXT"
   | "HTML"
   | "PDF"

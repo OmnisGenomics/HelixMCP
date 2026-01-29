@@ -92,6 +92,7 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
 	    "CSV",
 	    "JSON",
 	    "ZIP",
+	    "MD",
 	    "TEXT",
 	    "HTML",
 	    "PDF",

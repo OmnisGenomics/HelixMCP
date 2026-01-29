@@ -17,6 +17,7 @@ export const zArtifactType = z.enum([
   "CSV",
   "JSON",
   "ZIP",
+  "MD",
   "TEXT",
   "HTML",
   "PDF",
@@ -291,7 +292,29 @@ export const zFastqcOutputDocker = zProvenance.extend({
   log_artifact_id: zArtifactId
 });
 
-export const zFastqcOutputV1 = z.union([zFastqcOutputDocker, zSlurmSubmitOutput]);
+// NOTE: Avoid z.union here. MCP SDK schema plumbing is stricter than we want for hybrid tools.
+// This schema is a permissive, single-object contract that accepts either the Docker-complete shape
+// or the queued Slurm submit shape (or both) without crashing the server.
+export const zFastqcOutputV1 = zProvenance.extend({
+  // docker-complete fields
+  fastqc_html_artifact_id: zArtifactId.optional(),
+  fastqc_zip_artifact_id: zArtifactId.optional(),
+  metrics: z
+    .object({
+      pass: z.number().int(),
+      warn: z.number().int(),
+      fail: z.number().int(),
+      modules: z.record(z.string(), z.enum(["PASS", "WARN", "FAIL"])),
+      raw_lines: z.array(z.string())
+    })
+    .optional(),
+
+  // slurm-queued fields
+  slurm_job_id: z.string().min(1).max(64).optional(),
+  slurm_script_artifact_id: zArtifactId.optional(),
+
+  log_artifact_id: zArtifactId
+});
 
 export const zMultiqcInput = z.object({
   project_id: zProjectId,
@@ -310,13 +333,133 @@ export const zMultiqcOutputDocker = zProvenance.extend({
   log_artifact_id: zArtifactId
 });
 
-export const zMultiqcOutputV1 = z.union([zMultiqcOutputDocker, zSlurmSubmitOutput]);
+export const zMultiqcOutputV1 = zProvenance.extend({
+  // docker-complete fields
+  multiqc_html_artifact_id: zArtifactId.optional(),
+  multiqc_data_zip_artifact_id: zArtifactId.optional(),
+  metrics: z
+    .object({
+      samples: z.number().int().nullable(),
+      raw_general_stats_lines: z.array(z.string()).nullable()
+    })
+    .optional(),
+
+  // slurm-queued fields
+  slurm_job_id: z.string().min(1).max(64).optional(),
+  slurm_script_artifact_id: zArtifactId.optional(),
+
+  log_artifact_id: zArtifactId
+});
+
+export const zQcBundleFastqInput = z.object({
+  project_id: zProjectId,
+  reads_1_artifact_id: zArtifactId,
+  reads_2_artifact_id: zArtifactId.optional(),
+  backend: zBackend.optional(),
+  threads_fastqc: z.number().int().min(1).max(64).default(2),
+  threads_multiqc: z.number().int().min(1).max(64).default(2)
+});
+
+export const zQcBundlePhase = z.enum(["fastqc_submitted", "multiqc_submitted", "complete"]);
+
+export const zQcBundleFastqOutputV1 = zProvenance.extend({
+  phase: zQcBundlePhase,
+  expected_collect_run_ids: z.array(zRunId),
+  bundle_report_artifact_id: zArtifactId,
+
+  fastqc_run_ids: z.array(zRunId),
+  multiqc_run_id: zRunId.nullable(),
+
+  fastqc: z.object({
+    reads_1: z.object({
+      run_id: zRunId,
+      fastqc_html_artifact_id: zArtifactId.nullable(),
+      fastqc_zip_artifact_id: zArtifactId.nullable(),
+      metrics: z
+        .object({
+          pass: z.number().int(),
+          warn: z.number().int(),
+          fail: z.number().int()
+        })
+        .nullable()
+    }),
+    reads_2: z
+      .object({
+        run_id: zRunId,
+        fastqc_html_artifact_id: zArtifactId.nullable(),
+        fastqc_zip_artifact_id: zArtifactId.nullable(),
+        metrics: z
+          .object({
+            pass: z.number().int(),
+            warn: z.number().int(),
+            fail: z.number().int()
+          })
+          .nullable()
+      })
+      .nullable()
+  }),
+
+  multiqc: z
+    .object({
+      run_id: zRunId,
+      multiqc_html_artifact_id: zArtifactId.nullable(),
+      multiqc_data_zip_artifact_id: zArtifactId.nullable()
+    })
+    .nullable(),
+
+  graph: z.object({
+    graph_digest_sha256: zSha256,
+    nodes: z.array(
+      z.object({
+        run_id: zRunId,
+        tool_name: z.string().min(1),
+        contract_version: z.string().min(1)
+      })
+    ),
+    edges: z.array(
+      z.object({
+        from_run_id: zRunId,
+        to_run_id: zRunId,
+        kind: z.string().min(1)
+      })
+    )
+  }),
+
+  log_artifact_id: zArtifactId
+});
 
 export const zSamtoolsFlagstatInputV2 = zSamtoolsFlagstatInput.extend({
   backend: zBackend.optional()
 });
 
-export const zSamtoolsFlagstatOutputV2 = z.union([zSamtoolsFlagstatOutput, zSlurmSubmitOutput]);
+export const zSamtoolsFlagstatOutputV2 = zProvenance.extend({
+  // docker-complete fields
+  report_artifact_id: zArtifactId.optional(),
+  flagstat: z
+    .object({
+      total: zFlagstatCount.nullable(),
+      secondary: zFlagstatCount.nullable(),
+      supplementary: zFlagstatCount.nullable(),
+      duplicates: zFlagstatCount.nullable(),
+      mapped: zFlagstatCount.nullable(),
+      paired_in_sequencing: zFlagstatCount.nullable(),
+      read1: zFlagstatCount.nullable(),
+      read2: zFlagstatCount.nullable(),
+      properly_paired: zFlagstatCount.nullable(),
+      with_itself_and_mate_mapped: zFlagstatCount.nullable(),
+      singletons: zFlagstatCount.nullable(),
+      with_mate_mapped_to_different_chr: zFlagstatCount.nullable(),
+      with_mate_mapped_to_different_chr_mapq5: zFlagstatCount.nullable(),
+      raw_lines: z.array(z.string())
+    })
+    .optional(),
+
+  // slurm-queued fields
+  slurm_job_id: z.string().min(1).max(64).optional(),
+  slurm_script_artifact_id: zArtifactId.optional(),
+
+  log_artifact_id: zArtifactId
+});
 
 export const zSlurmJobGetInput = z.object({
   run_id: zRunId

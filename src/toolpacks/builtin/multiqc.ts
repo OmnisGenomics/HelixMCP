@@ -131,7 +131,8 @@ export const multiqcTool: ToolDefinition<Args, DockerExecutionPlan | SlurmExecut
         role: "fastqc_zip",
         artifact_id: a.artifactId,
         checksum_sha256: a.checksumSha256,
-        dest_relpath: `in/fastqc_${pad4(idx + 1)}.zip`
+        // MultiQC's FastQC module matching is filename-sensitive; preserve the "*_fastqc.zip" suffix.
+        dest_relpath: `in/fastqc_${pad4(idx + 1)}_fastqc.zip`
       }));
 
       const plan: SlurmExecutionPlan = {
@@ -195,7 +196,8 @@ export const multiqcTool: ToolDefinition<Args, DockerExecutionPlan | SlurmExecut
     const planInputs = sorted.map((a, idx) => ({
       role: "fastqc_zip",
       artifact: a,
-      destName: `fastqc_${pad4(idx + 1)}.zip`
+      // MultiQC's FastQC module matching is filename-sensitive; preserve the "*_fastqc.zip" suffix.
+      destName: `fastqc_${pad4(idx + 1)}_fastqc.zip`
     }));
 
     const plan: DockerExecutionPlan = {
@@ -216,7 +218,8 @@ export const multiqcTool: ToolDefinition<Args, DockerExecutionPlan | SlurmExecut
       docker: {
         image: MULTIQC_DOCKER_IMAGE,
         network_mode: ctx.policy.dockerNetworkMode(),
-        argv: plan.argv
+        argv: plan.argv,
+        input_filenames: planInputs.map((i) => i.destName)
       }
     };
 

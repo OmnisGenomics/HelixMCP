@@ -2,34 +2,26 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "helixmcp:tool:multiqc:out:v1",
   "title": "multiqc output",
-  "oneOf": [
-    {
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["provenance_run_id", "log_artifact_id"],
+  "properties": {
+    "provenance_run_id": { "$ref": "helixmcp:common#/$defs/RunId" },
+    "log_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" },
+
+    "multiqc_html_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" },
+    "multiqc_data_zip_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" },
+    "metrics": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "provenance_run_id",
-        "multiqc_html_artifact_id",
-        "multiqc_data_zip_artifact_id",
-        "metrics",
-        "log_artifact_id"
-      ],
+      "required": ["samples", "raw_general_stats_lines"],
       "properties": {
-        "provenance_run_id": { "$ref": "helixmcp:common#/$defs/RunId" },
-        "multiqc_html_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" },
-        "multiqc_data_zip_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" },
-        "metrics": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["samples", "raw_general_stats_lines"],
-          "properties": {
-            "samples": { "type": ["integer", "null"], "minimum": 0 },
-            "raw_general_stats_lines": { "type": ["array", "null"], "items": { "type": "string" } }
-          }
-        },
-        "log_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" }
+        "samples": { "type": ["integer", "null"], "minimum": 0 },
+        "raw_general_stats_lines": { "type": ["array", "null"], "items": { "type": "string" } }
       }
     },
-    { "$ref": "helixmcp:tool:slurm_submit:out:v1" }
-  ]
-}
 
+    "slurm_job_id": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "slurm_script_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" }
+  }
+}

@@ -22,6 +22,7 @@ import { registerToolDefinitions } from "../src/toolpacks/register.js";
 import { deriveRunId } from "../src/runs/runIdentity.js";
 import { executeSlurmPlan, type SlurmExecutionPlan } from "../src/toolpacks/slurm/executeSlurm.js";
 import { multiqcTool } from "../src/toolpacks/builtin/multiqc.js";
+import { qcBundleFastqTool } from "../src/toolpacks/builtin/qcBundleFastq.js";
 
 describe("toolpacks", () => {
   it("fails closed on invalid tool definitions", () => {
@@ -849,6 +850,86 @@ describe("toolpacks", () => {
       });
 
       expect(r1.runId).toBe(r2.runId);
+    } finally {
+      if (pool) await pool.end();
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("qc_bundle_fastq canonicalizes to phase_intent=submit_fastqc for backend=slurm with no completed runs", async () => {
+    const tmpDir = await mkdtemp(path.join(os.tmpdir(), "helixmcp-toolpacks-"));
+    let pool: pg.Pool | null = null;
+
+    try {
+      const mem = newDb({ autoCreateForeignKeyIndices: true });
+      const adapter = mem.adapters.createPg();
+      pool = new adapter.Pool() as unknown as pg.Pool;
+      await applySqlFile(pool, path.resolve("db/schema.sql"));
+
+      const db = createDb(pool);
+      const store = new PostgresStore(db);
+      const objects = new LocalObjectStore(path.join(tmpDir, "objects"));
+      const artifacts = new ArtifactService(store, objects);
+      const runsDir = path.join(tmpDir, "runs");
+
+      const policy = new PolicyEngine({
+        version: 1,
+        runtime: { instance_id: "local" },
+        tool_allowlist: ["qc_bundle_fastq"],
+        quotas: { max_threads: 8, max_runtime_seconds: 60, max_import_bytes: 1024 * 1024 },
+        imports: { allow_source_kinds: ["inline_text"], local_path_prefix_allowlist: [], deny_symlinks: true },
+        docker: {
+          network_mode: "none",
+          image_allowlist: [
+            "quay.io/biocontainers/fastqc@sha256:e194048df39c3145d9b4e0a14f4da20b59d59250465b6f2a9cb698445fd45900",
+            "quay.io/biocontainers/multiqc@sha256:ecafca93ba3346775b773bbfd6ff920ecfc259f554777576c15d3139c678311b"
+          ]
+        },
+        slurm: {
+          partitions_allowlist: ["short"],
+          accounts_allowlist: ["bio"],
+          qos_allowlist: ["normal"],
+          constraints_allowlist: [""],
+          max_time_limit_seconds: 3600,
+          max_cpus: 32,
+          max_mem_mb: 262144,
+          max_gpus: 0,
+          max_collect_output_bytes: 1024 * 1024,
+          max_collect_log_bytes: 1024 * 1024,
+          apptainer: {
+            image_allowlist: [
+              "docker://quay.io/biocontainers/fastqc@sha256:e194048df39c3145d9b4e0a14f4da20b59d59250465b6f2a9cb698445fd45900",
+              "docker://quay.io/biocontainers/multiqc@sha256:ecafca93ba3346775b773bbfd6ff920ecfc259f554777576c15d3139c678311b"
+            ]
+          },
+          network_mode_required: "none"
+        }
+      });
+
+      const projectId = "proj_01HZZZZZZZZZZZZZZZZZZZZZZZ";
+      const reads1 = await artifacts.importArtifact({
+        projectId: projectId as any,
+        source: { kind: "inline_text", text: "not really gz\n" },
+        typeHint: "FASTQ_GZ",
+        label: "reads_1.fastq.gz",
+        createdByRunId: null,
+        maxBytes: null
+      });
+
+      const ctx = { policy, store, artifacts, runsDir } as any;
+
+      const prepared = await qcBundleFastqTool.canonicalize(
+        {
+          project_id: projectId,
+          reads_1_artifact_id: reads1.artifactId,
+          backend: "slurm"
+        } as any,
+        ctx
+      );
+
+      expect(prepared.selectedPlanKind).toBe("slurm");
+      expect((prepared.canonicalParams as any).backend).toBe("slurm");
+      expect((prepared.canonicalParams as any).phase_intent).toBe("submit_fastqc");
     } finally {
       if (pool) await pool.end();
       await rm(tmpDir, { recursive: true, force: true });

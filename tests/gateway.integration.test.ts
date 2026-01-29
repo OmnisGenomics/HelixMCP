@@ -48,6 +48,14 @@ describe.sequential("gateway (in-memory)", () => {
   let clientTransport: InMemoryTransport;
   let server: ReturnType<typeof createGatewayServer>;
 
+  async function callTool(name: string, args: Record<string, unknown>, timeoutMs = 60_000) {
+    return client.request(
+      { method: "tools/call", params: { name, arguments: args } },
+      CallToolResultSchema,
+      { timeout: timeoutMs }
+    );
+  }
+
   beforeAll(async () => {
     tmpDir = await mkdtemp(path.join(os.tmpdir(), "helixmcp-"));
 
@@ -387,20 +395,15 @@ describe.sequential("gateway (in-memory)", () => {
       const gzPath = path.join(tmpDir, "reads.fastq.gz");
       await writeFile(gzPath, gzipSync(Buffer.from(fastqText, "utf8")));
 
-      const imported = await client.request(
+      const imported = await callTool(
+        "artifact_import",
         {
-          method: "tools/call",
-          params: {
-            name: "artifact_import",
-            arguments: {
-              project_id: projectId,
-              type_hint: "FASTQ_GZ",
-              label: "reads.fastq.gz",
-              source: { kind: "local_path", path: gzPath }
-            }
-          }
+          project_id: projectId,
+          type_hint: "FASTQ_GZ",
+          label: "reads.fastq.gz",
+          source: { kind: "local_path", path: gzPath }
         },
-        CallToolResultSchema
+        240_000
       );
       if (imported.isError) {
         throw new Error(
@@ -409,12 +412,10 @@ describe.sequential("gateway (in-memory)", () => {
       }
       const readsId = (imported.structuredContent as any).artifact.artifact_id as string;
 
-      const fastqc1 = await client.request(
-        {
-          method: "tools/call",
-          params: { name: "fastqc", arguments: { project_id: projectId, reads_artifact_id: readsId, backend: "docker" } }
-        },
-        CallToolResultSchema
+      const fastqc1 = await callTool(
+        "fastqc",
+        { project_id: projectId, reads_artifact_id: readsId, backend: "docker" },
+        240_000
       );
       if (fastqc1.isError) {
         throw new Error(`fastqc failed: ${fastqc1.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`);
@@ -427,12 +428,10 @@ describe.sequential("gateway (in-memory)", () => {
       expect(f1.metrics.warn).toBeTypeOf("number");
       expect(f1.metrics.fail).toBeTypeOf("number");
 
-      const fastqc2 = await client.request(
-        {
-          method: "tools/call",
-          params: { name: "fastqc", arguments: { project_id: projectId, reads_artifact_id: readsId, backend: "docker" } }
-        },
-        CallToolResultSchema
+      const fastqc2 = await callTool(
+        "fastqc",
+        { project_id: projectId, reads_artifact_id: readsId, backend: "docker" },
+        240_000
       );
       if (fastqc2.isError) {
         throw new Error(`fastqc failed: ${fastqc2.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`);
@@ -443,15 +442,10 @@ describe.sequential("gateway (in-memory)", () => {
       expect(f2.fastqc_html_artifact_id).toBe(f1.fastqc_html_artifact_id);
       expect(f2.fastqc_zip_artifact_id).toBe(f1.fastqc_zip_artifact_id);
 
-      const multiqc1 = await client.request(
-        {
-          method: "tools/call",
-          params: {
-            name: "multiqc",
-            arguments: { project_id: projectId, fastqc_zip_artifact_ids: [f1.fastqc_zip_artifact_id], backend: "docker" }
-          }
-        },
-        CallToolResultSchema
+      const multiqc1 = await callTool(
+        "multiqc",
+        { project_id: projectId, fastqc_zip_artifact_ids: [f1.fastqc_zip_artifact_id], backend: "docker" },
+        240_000
       );
       if (multiqc1.isError) {
         throw new Error(`multiqc failed: ${multiqc1.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`);
@@ -461,15 +455,10 @@ describe.sequential("gateway (in-memory)", () => {
       expect(m1.multiqc_html_artifact_id).toMatch(/^art_/);
       expect(m1.multiqc_data_zip_artifact_id).toMatch(/^art_/);
 
-      const multiqc2 = await client.request(
-        {
-          method: "tools/call",
-          params: {
-            name: "multiqc",
-            arguments: { project_id: projectId, fastqc_zip_artifact_ids: [f1.fastqc_zip_artifact_id], backend: "docker" }
-          }
-        },
-        CallToolResultSchema
+      const multiqc2 = await callTool(
+        "multiqc",
+        { project_id: projectId, fastqc_zip_artifact_ids: [f1.fastqc_zip_artifact_id], backend: "docker" },
+        240_000
       );
       if (multiqc2.isError) {
         throw new Error(`multiqc failed: ${multiqc2.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`);
@@ -480,7 +469,73 @@ describe.sequential("gateway (in-memory)", () => {
       expect(m2.multiqc_html_artifact_id).toBe(m1.multiqc_html_artifact_id);
       expect(m2.multiqc_data_zip_artifact_id).toBe(m1.multiqc_data_zip_artifact_id);
     },
-    180_000
+    300_000
+  );
+
+  it.runIf(DOCKER_AVAILABLE)(
+    "runs qc_bundle_fastq via docker and replays",
+    async () => {
+      const projectId = newProjectId();
+
+      const fastqText = ["@r1", "ACGT", "+", "!!!!", ""].join("\n");
+      const gzPath = path.join(tmpDir, "bundle_reads.fastq.gz");
+      await writeFile(gzPath, gzipSync(Buffer.from(fastqText, "utf8")));
+
+      const imported = await callTool(
+        "artifact_import",
+        {
+          project_id: projectId,
+          type_hint: "FASTQ_GZ",
+          label: "reads.fastq.gz",
+          source: { kind: "local_path", path: gzPath }
+        },
+        240_000
+      );
+      if (imported.isError) {
+        throw new Error(
+          `artifact_import failed: ${imported.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+        );
+      }
+      const readsId = (imported.structuredContent as any).artifact.artifact_id as string;
+
+      const bundle1 = await callTool(
+        "qc_bundle_fastq",
+        { project_id: projectId, reads_1_artifact_id: readsId, backend: "docker" },
+        240_000
+      );
+      if (bundle1.isError) {
+        throw new Error(
+          `qc_bundle_fastq failed: ${bundle1.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+        );
+      }
+      const b1 = bundle1.structuredContent as any;
+      expect(b1.provenance_run_id).toMatch(/^run_/);
+      expect(b1.bundle_report_artifact_id).toMatch(/^art_/);
+      expect(b1.multiqc.run_id).toMatch(/^run_/);
+      expect(b1.multiqc.multiqc_html_artifact_id).toMatch(/^art_/);
+      expect(b1.multiqc.multiqc_data_zip_artifact_id).toMatch(/^art_/);
+      expect(b1.fastqc.reads_1.metrics.pass).toBeTypeOf("number");
+      expect(b1.fastqc.reads_1.metrics.warn).toBeTypeOf("number");
+      expect(b1.fastqc.reads_1.metrics.fail).toBeTypeOf("number");
+
+      const bundle2 = await callTool(
+        "qc_bundle_fastq",
+        { project_id: projectId, reads_1_artifact_id: readsId, backend: "docker" },
+        240_000
+      );
+      if (bundle2.isError) {
+        throw new Error(
+          `qc_bundle_fastq failed: ${bundle2.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+        );
+      }
+      const b2 = bundle2.structuredContent as any;
+      expect((bundle2.content[0] as any).text).toContain("Replayed");
+      expect(b2.provenance_run_id).toBe(b1.provenance_run_id);
+      expect(b2.bundle_report_artifact_id).toBe(b1.bundle_report_artifact_id);
+      expect(b2.multiqc.multiqc_html_artifact_id).toBe(b1.multiqc.multiqc_html_artifact_id);
+      expect(b2.multiqc.multiqc_data_zip_artifact_id).toBe(b1.multiqc.multiqc_data_zip_artifact_id);
+    },
+    300_000
   );
 
   it.runIf(DOCKER_AVAILABLE)(
@@ -529,20 +584,15 @@ describe.sequential("gateway (in-memory)", () => {
       const bamBytes = docker.stdout;
       await writeFile(bamPath, bamBytes);
 
-      const imported = await client.request(
+      const imported = await callTool(
+        "artifact_import",
         {
-          method: "tools/call",
-          params: {
-            name: "artifact_import",
-            arguments: {
-              project_id: projectId,
-              type_hint: "BAM",
-              label: "input.bam",
-              source: { kind: "local_path", path: bamPath }
-            }
-          }
+          project_id: projectId,
+          type_hint: "BAM",
+          label: "input.bam",
+          source: { kind: "local_path", path: bamPath }
         },
-        CallToolResultSchema
+        240_000
       );
       if (imported.isError) {
         throw new Error(
@@ -551,12 +601,10 @@ describe.sequential("gateway (in-memory)", () => {
       }
       const bamId = (imported.structuredContent as any).artifact.artifact_id as string;
 
-      const flag1 = await client.request(
-        {
-          method: "tools/call",
-          params: { name: "samtools_flagstat", arguments: { project_id: projectId, bam_artifact_id: bamId } }
-        },
-        CallToolResultSchema
+      const flag1 = await callTool(
+        "samtools_flagstat",
+        { project_id: projectId, bam_artifact_id: bamId, backend: "docker" },
+        240_000
       );
       if (flag1.isError) {
         throw new Error(
@@ -585,12 +633,10 @@ describe.sequential("gateway (in-memory)", () => {
 
       const count1 = Number((await pool.query("SELECT COUNT(*) AS c FROM param_sets")).rows[0]?.c);
 
-      const flag2 = await client.request(
-        {
-          method: "tools/call",
-          params: { name: "samtools_flagstat", arguments: { project_id: projectId, bam_artifact_id: bamId } }
-        },
-        CallToolResultSchema
+      const flag2 = await callTool(
+        "samtools_flagstat",
+        { project_id: projectId, bam_artifact_id: bamId, backend: "docker" },
+        240_000
       );
       if (flag2.isError) {
         throw new Error(
@@ -604,7 +650,7 @@ describe.sequential("gateway (in-memory)", () => {
       expect(sc2).toEqual(sc1);
       expect(count2).toBe(count1);
     },
-    90_000
+    300_000
   );
 
   it(

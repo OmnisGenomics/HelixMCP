@@ -57,9 +57,23 @@ function fastqcScript(threads: number): string {
     "rm -rf /work/out/tmp_fastqc",
     "mkdir -p /work/out/tmp_fastqc",
     `fastqc --threads ${threads} --extract -o /work/out/tmp_fastqc /work/in/reads.fastq.gz`,
-    "mv /work/out/tmp_fastqc/*_fastqc.html /work/out/fastqc.html",
-    "mv /work/out/tmp_fastqc/*_fastqc.zip /work/out/fastqc.zip",
-    "cp /work/out/tmp_fastqc/*_fastqc/summary.txt /work/out/summary.txt"
+    // Fail closed: require exactly one HTML and one ZIP output.
+    "html_files=$(find /work/out/tmp_fastqc -maxdepth 1 -type f -name '*_fastqc.html' -print)",
+    "zip_files=$(find /work/out/tmp_fastqc -maxdepth 1 -type f -name '*_fastqc.zip' -print)",
+    "html_count=$(printf '%s\\n' \"$html_files\" | sed '/^$/d' | wc -l | tr -d ' ')",
+    "zip_count=$(printf '%s\\n' \"$zip_files\" | sed '/^$/d' | wc -l | tr -d ' ')",
+    "test \"$html_count\" -eq 1 || { echo \"expected 1 fastqc html, got $html_count\" >&2; exit 2; }",
+    "test \"$zip_count\" -eq 1 || { echo \"expected 1 fastqc zip, got $zip_count\" >&2; exit 2; }",
+    "html_file=$(printf '%s\\n' \"$html_files\" | sed '/^$/d' | head -n 1)",
+    "zip_file=$(printf '%s\\n' \"$zip_files\" | sed '/^$/d' | head -n 1)",
+    "mv \"$html_file\" /work/out/fastqc.html",
+    "mv \"$zip_file\" /work/out/fastqc.zip",
+    // Copy summary.txt from the extracted directory.
+    "summary_files=$(find /work/out/tmp_fastqc -maxdepth 2 -type f -name 'summary.txt' -print)",
+    "summary_count=$(printf '%s\\n' \"$summary_files\" | sed '/^$/d' | wc -l | tr -d ' ')",
+    "test \"$summary_count\" -eq 1 || { echo \"expected 1 fastqc summary.txt, got $summary_count\" >&2; exit 2; }",
+    "summary_file=$(printf '%s\\n' \"$summary_files\" | sed '/^$/d' | head -n 1)",
+    "cp \"$summary_file\" /work/out/summary.txt"
   ].join("; ");
 }
 
@@ -313,4 +327,3 @@ export const fastqcTool: ToolDefinition<Args, DockerExecutionPlan | SlurmExecuti
     };
   }
 };
-

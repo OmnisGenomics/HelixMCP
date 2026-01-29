@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:qc_bundle_fastq:out:v1",
+  "title": "qc_bundle_fastq output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "provenance_run_id",
+    "bundle_report_artifact_id",
+    "phase",
+    "expected_collect_run_ids",
+    "fastqc_run_ids",
+    "multiqc_run_id",
+    "fastqc",
+    "multiqc",
+    "graph",
+    "log_artifact_id"
+  ],
+  "properties": {
+    "provenance_run_id": { "$ref": "helixmcp:common#/$defs/RunId" },
+    "bundle_report_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" },
+    "phase": { "type": "string", "enum": ["fastqc_submitted", "multiqc_submitted", "complete"] },
+    "expected_collect_run_ids": { "type": "array", "items": { "$ref": "helixmcp:common#/$defs/RunId" } },
+    "fastqc_run_ids": { "type": "array", "items": { "$ref": "helixmcp:common#/$defs/RunId" } },
+    "multiqc_run_id": { "oneOf": [{ "$ref": "helixmcp:common#/$defs/RunId" }, { "type": "null" }] },
+    "fastqc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reads_1", "reads_2"],
+      "properties": {
+        "reads_1": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["run_id", "fastqc_html_artifact_id", "fastqc_zip_artifact_id", "metrics"],
+          "properties": {
+            "run_id": { "$ref": "helixmcp:common#/$defs/RunId" },
+            "fastqc_html_artifact_id": { "oneOf": [{ "$ref": "helixmcp:common#/$defs/ArtifactId" }, { "type": "null" }] },
+            "fastqc_zip_artifact_id": { "oneOf": [{ "$ref": "helixmcp:common#/$defs/ArtifactId" }, { "type": "null" }] },
+            "metrics": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["pass", "warn", "fail"],
+                  "properties": {
+                    "pass": { "type": "integer", "minimum": 0 },
+                    "warn": { "type": "integer", "minimum": 0 },
+                    "fail": { "type": "integer", "minimum": 0 }
+                  }
+                },
+                { "type": "null" }
+              ]
+            }
+          }
+        },
+        "reads_2": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["run_id", "fastqc_html_artifact_id", "fastqc_zip_artifact_id", "metrics"],
+              "properties": {
+                "run_id": { "$ref": "helixmcp:common#/$defs/RunId" },
+                "fastqc_html_artifact_id": { "oneOf": [{ "$ref": "helixmcp:common#/$defs/ArtifactId" }, { "type": "null" }] },
+                "fastqc_zip_artifact_id": { "oneOf": [{ "$ref": "helixmcp:common#/$defs/ArtifactId" }, { "type": "null" }] },
+                "metrics": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["pass", "warn", "fail"],
+                      "properties": {
+                        "pass": { "type": "integer", "minimum": 0 },
+                        "warn": { "type": "integer", "minimum": 0 },
+                        "fail": { "type": "integer", "minimum": 0 }
+                      }
+                    },
+                    { "type": "null" }
+                  ]
+                }
+              }
+            },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "multiqc": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["run_id", "multiqc_html_artifact_id", "multiqc_data_zip_artifact_id"],
+          "properties": {
+            "run_id": { "$ref": "helixmcp:common#/$defs/RunId" },
+            "multiqc_html_artifact_id": { "oneOf": [{ "$ref": "helixmcp:common#/$defs/ArtifactId" }, { "type": "null" }] },
+            "multiqc_data_zip_artifact_id": { "oneOf": [{ "$ref": "helixmcp:common#/$defs/ArtifactId" }, { "type": "null" }] }
+          }
+        },
+        { "type": "null" }
+      ]
+    },
+    "graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["graph_digest_sha256", "nodes", "edges"],
+      "properties": {
+        "graph_digest_sha256": { "$ref": "helixmcp:common#/$defs/Sha256" },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["run_id", "tool_name", "contract_version"],
+            "properties": {
+              "run_id": { "$ref": "helixmcp:common#/$defs/RunId" },
+              "tool_name": { "type": "string", "minLength": 1 },
+              "contract_version": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["from_run_id", "to_run_id", "kind"],
+            "properties": {
+              "from_run_id": { "$ref": "helixmcp:common#/$defs/RunId" },
+              "to_run_id": { "$ref": "helixmcp:common#/$defs/RunId" },
+              "kind": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "log_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" }
+  }
+}

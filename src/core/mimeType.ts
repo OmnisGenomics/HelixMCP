@@ -12,6 +12,8 @@ export function mimeTypeForArtifactType(type: ArtifactType): string {
       return "application/pdf";
     case "ZIP":
       return "application/zip";
+    case "MD":
+      return "text/markdown";
     case "TSV":
     case "CSV":
     case "TEXT":

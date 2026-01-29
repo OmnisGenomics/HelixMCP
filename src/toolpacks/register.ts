@@ -25,6 +25,7 @@ const ARTIFACT_TYPES: Set<ArtifactType> = new Set<ArtifactType>([
   "CSV",
   "JSON",
   "ZIP",
+  "MD",
   "TEXT",
   "HTML",
   "PDF",
