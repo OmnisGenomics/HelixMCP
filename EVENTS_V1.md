@@ -1,4 +1,31 @@
-# Events v1 (run_events)
+# Events v1 (FROZEN)
+
+Status: **FROZEN** as of HelixMCP v0.9.0.
+
+This document defines the Event v1 envelope and the semantics for event kinds emitted into `run_events`. Consumers should rely on Events v1, not log text scraping.
+
+## What “FROZEN” means
+
+In all HelixMCP **v1.x** releases:
+
+- The Event v1 envelope fields and meanings will not change in a breaking way.
+- New event kinds may be added. Existing kinds will not be removed or repurposed.
+- Event payloads may gain new fields, but existing fields will not change meaning.
+
+## Event envelope (v1)
+
+Events are stored as rows in `run_events`, and may also appear as JSONL lines in log artifacts.
+
+**Stable fields (v1):**
+
+- `run_id`: the emitting run id (stored as a DB column; may also be included when exporting events)
+- `created_at`: RFC3339 timestamp (stored as the DB `ts` column)
+- `kind`: stable kind string (see Kind enum)
+- `message`: human readable short text (do not parse)
+- `data`: optional structured JSON payload (object or null)
+
+Event versioning:
+- Event ABI is **v1** by this document. An explicit `event_version` field may be added in a future additive change, but consumers should treat this document as the version signal today.
 
 HelixMCP records append-only events in Postgres in the `run_events` table for audit and debugging. Events are **not** used for run identity or replay.
 
@@ -13,9 +40,9 @@ HelixMCP records append-only events in Postgres in the `run_events` table for au
 - `message`: optional human-readable message
 - `data`: optional JSON payload
 
-## Event envelope (stable)
+## Log-line representation (JSONL)
 
-An event is represented as:
+Log artifacts may contain JSONL lines shaped like:
 
 ```json
 {
@@ -27,9 +54,8 @@ An event is represented as:
 ```
 
 Notes:
-
 - In Postgres, `run_id` is a separate column and `ts` is the DB timestamp.
-- Log artifacts may also contain JSONL lines with the same shape; treat Postgres as the source of truth.
+- Treat Postgres as the source of truth.
 
 ## Kind conventions (v1)
 
@@ -78,4 +104,3 @@ Event kinds are **strings**, with these conventions:
 
 - Adding a new `kind` is an additive change.
 - Changing the meaning of an existing `kind` or its `data` shape is a breaking change and must be versioned.
-

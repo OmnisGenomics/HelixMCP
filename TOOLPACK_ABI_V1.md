@@ -1,6 +1,33 @@
-# Toolpack ABI v1
+# Toolpack ABI v1 (FROZEN)
 
-This document defines the **Toolpack ABI v1** for HelixMCP. Toolpacks are TypeScript modules that register deterministic, policy-gated tools without turning the gateway into a monolith.
+Status: **FROZEN** as of HelixMCP v0.9.0.
+
+This document defines the **Toolpack ABI v1**: the stable interface a toolpack must implement to be loaded by HelixMCP, and the behavioral guarantees HelixMCP makes in v1.x.
+
+## What “FROZEN” means
+
+In all HelixMCP **v1.x** releases:
+
+- The Toolpack ABI v1 surface will not change in a way that breaks existing toolpacks that conform to this document.
+- Changes will be **additive only** (new optional fields, new tools, new docs, new validations that only tighten previously-undefined behavior).
+- If a breaking change is ever required, it will ship under a **new ABI version** (e.g. `abiVersion: "v2"`), and v1 will continue to be supported through the v1.x line.
+
+## Required declarations
+
+Every toolpack definition **must** include:
+
+- `abiVersion: "v1"` (string literal)
+- `toolName` (lowercase snake_case)
+- `contractVersion` (e.g. "v1")
+- `planKind` (docker | slurm | hybrid)
+- `declaredOutputs` (roles/types/labels; for Slurm/hybrid include `srcRelpath`)
+- `canonicalize(args, ctx)` returning JSON-safe canonical params
+- `run({ runId, toolRun, prepared, ctx })` returning a summary + JSON result payload
+
+The gateway is **fail-closed**:
+- Any toolpack missing `abiVersion` or declaring a value other than `"v1"` is rejected at startup.
+
+Toolpacks are TypeScript modules that register deterministic, policy-gated tools without turning the gateway into a monolith.
 
 ## Guarantees (what ABI v1 means)
 
@@ -87,4 +114,3 @@ The special role `log` is reserved and is produced automatically by `ToolRun`.
 - No direct filesystem reads outside the run workspace materialization.
 - No implicit network access (policy decides).
 - No dynamic, mutable-state tools without explicit snapshot boundaries in canonical params.
-
