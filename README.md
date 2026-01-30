@@ -64,3 +64,11 @@ Export and verify an offline audit bundle for a run (dir or deterministic `.tar`
 ## License
 
 Apache-2.0 (see `LICENSE`).
+
+## Security
+
+See `SECURITY.md`. Please report vulnerabilities via GitHub Security Advisories (private reporting).
+
+## Stability
+
+See `VERSIONING.md`, `TOOLPACK_ABI_V1.md`, and `EVENTS_V1.md` for the stability contract.

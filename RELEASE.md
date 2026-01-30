@@ -1,3 +1,12 @@
+# HelixMCP v1.0.1
+
+Documentation polish only. No behavior changes.
+
+What is included:
+- README pointers to `SECURITY.md` + GitHub Security Advisories
+- README pointers to stability docs (`VERSIONING.md`, `TOOLPACK_ABI_V1.md`, `EVENTS_V1.md`)
+- Audit bundle export proof reference: introduced in `v0.9.5`
+
 # HelixMCP v1.0.0
 
 This release is a stability declaration.
