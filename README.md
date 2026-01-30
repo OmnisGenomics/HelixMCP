@@ -1,4 +1,4 @@
-# HelixMCP (BioMCP Fabric Gateway) — in silico
+# HelixMCP (BioMCP Fabric Gateway)
 
 Governed, reproducible MCP gateway skeleton for bioinformatics compute + database tooling:
 
