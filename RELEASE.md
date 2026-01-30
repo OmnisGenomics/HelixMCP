@@ -1,3 +1,12 @@
+# HelixMCP v1.0.0
+
+This release is a stability declaration.
+
+What is included:
+- Toolpack ABI v1 and Events v1 are stable for the v1.x line (additive-only; see `TOOLPACK_ABI_V1.md`, `EVENTS_V1.md`, `VERSIONING.md`)
+- Security policy and threat model (`SECURITY.md`)
+- Migration guide (`MIGRATION.md`)
+
 # HelixMCP v0.9.5
 
 This release adds deterministic, offline-verifiable audit bundle export as a CLI.
