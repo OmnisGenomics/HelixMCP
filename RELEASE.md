@@ -1,3 +1,7 @@
+# HelixMCP v0.9.0
+
+HelixMCP v0.9.0 freezes Toolpack ABI v1 and Events v1. All v1.x releases are additive-only. Toolpacks built against ABI v1 will continue to run unchanged.
+
 # HelixMCP v0.8.1
 
 This release adds a deterministic, audit-friendly FASTQ QC on-ramp built from toolpacks.
