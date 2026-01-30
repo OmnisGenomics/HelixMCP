@@ -42,6 +42,10 @@ The `qc_bundle_fastq` tool is deterministic and audit-friendly. On `backend: "sl
 4. Collect the MultiQC run: call `slurm_job_collect` for that run id.
 5. Call `qc_bundle_fastq` a final time to get `phase="complete"` and the final `bundle_report_artifact_id`.
 
+## Audit bundle export (CLI)
+
+Export and verify an offline audit bundle for a run (dir or deterministic `.tar`): see `docs/bundle_export.md`.
+
 ### Configuration
 
 - `DATABASE_URL` (optional): if unset, gateway uses in-memory Postgres (`pg-mem`) for dev.

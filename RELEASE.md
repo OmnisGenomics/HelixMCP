@@ -1,3 +1,12 @@
+# HelixMCP v0.9.5
+
+This release adds deterministic, offline-verifiable audit bundle export as a CLI.
+
+What is included:
+- `scripts/bundle_export.ts`: exports a run bundle (dir or deterministic `.tar`) with optional blob inclusion and per-blob size caps
+- `scripts/bundle_verify.ts`: verifies bundle structure and content hashes offline (supports dir or `.tar`)
+- Bundle manifest v1 contract: `contracts/bundles/bundle_manifest.v1.schema.json`
+
 # HelixMCP v0.9.0
 
 HelixMCP v0.9.0 freezes Toolpack ABI v1 and Events v1. All v1.x releases are additive-only. Toolpacks built against ABI v1 will continue to run unchanged.

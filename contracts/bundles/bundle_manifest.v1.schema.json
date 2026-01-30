@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:bundle:manifest:v1",
+  "title": "HelixMCP Bundle Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["bundle_version", "root_run_id", "include_blobs", "max_blob_bytes", "files"],
+  "properties": {
+    "bundle_version": { "type": "integer", "const": 1 },
+    "root_run_id": { "$ref": "helixmcp:common#/$defs/RunId" },
+    "include_blobs": { "type": "string", "enum": ["none", "selected", "all"] },
+    "max_blob_bytes": { "type": "string", "pattern": "^[0-9]+$" },
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "size_bytes"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": { "$ref": "helixmcp:common#/$defs/Sha256" },
+          "size_bytes": { "type": "string", "pattern": "^[0-9]+$" }
+        }
+      }
+    }
+  }
+}

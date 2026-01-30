@@ -11,7 +11,9 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "bundle:export": "tsx scripts/bundle_export.ts",
+    "bundle:verify": "tsx scripts/bundle_verify.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.25.3",

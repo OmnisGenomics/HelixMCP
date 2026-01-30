@@ -5,6 +5,15 @@ import type { RunRecord, RunStatus } from "../core/run.js";
 import type { ArtifactId, ProjectId, RunId } from "../core/ids.js";
 import type { DB } from "../db/types.js";
 
+export interface RunEventRecord {
+  eventId: string;
+  runId: RunId;
+  createdAt: string;
+  kind: string;
+  message: string | null;
+  data: JsonObject | null;
+}
+
 function toIso(value: unknown): string {
   if (value instanceof Date) return value.toISOString();
   if (typeof value === "string") return value;
@@ -18,6 +27,12 @@ function toIsoOrNull(value: unknown): string | null {
 
 export class PostgresStore {
   constructor(private readonly db: Kysely<DB>) {}
+
+  async listRuns(runIds: RunId[]): Promise<RunRecord[]> {
+    if (runIds.length === 0) return [];
+    const rows = await this.db.selectFrom("runs").selectAll().where("run_id", "in", runIds).execute();
+    return rows.map((r) => this.mapRun(r)).sort((a, b) => a.runId.localeCompare(b.runId));
+  }
 
   async getArtifactListSnapshot(projectId: ProjectId): Promise<{ artifactCount: string; asOfCreatedAt: string | null }> {
     const row = await this.db
@@ -114,6 +129,26 @@ export class PostgresStore {
       createdByRunId: (row.created_by_run_id as RunId | null) ?? null,
       metadata: (row.metadata ?? {}) as JsonObject
     };
+  }
+
+  async listArtifactsById(artifactIds: ArtifactId[]): Promise<ArtifactRecord[]> {
+    if (artifactIds.length === 0) return [];
+    const rows = await this.db.selectFrom("artifacts").selectAll().where("artifact_id", "in", artifactIds).execute();
+    return rows
+      .map((row) => ({
+        artifactId: row.artifact_id as ArtifactId,
+        projectId: row.project_id as ProjectId,
+        type: row.type as ArtifactType,
+        uri: row.uri,
+        mimeType: row.mime_type,
+        sizeBytes: BigInt(row.size_bytes),
+        checksumSha256: row.checksum_sha256 as `sha256:${string}`,
+        label: row.label,
+        createdAt: toIso((row as unknown as { created_at: unknown }).created_at),
+        createdByRunId: (row.created_by_run_id as RunId | null) ?? null,
+        metadata: (row.metadata ?? {}) as JsonObject
+      }))
+      .sort((a, b) => a.artifactId.localeCompare(b.artifactId));
   }
 
   async listArtifacts(projectId: ProjectId, limit: number, asOfCreatedAt?: string | null): Promise<ArtifactRecord[]> {
@@ -286,6 +321,24 @@ export class PostgresStore {
         data: data ?? null
       })
       .execute();
+  }
+
+  async listRunEvents(runId: RunId): Promise<RunEventRecord[]> {
+    const rows = await this.db
+      .selectFrom("run_events")
+      .select(["event_id", "run_id", "ts", "kind", "message", "data"])
+      .where("run_id", "=", runId)
+      .orderBy("event_id", "asc")
+      .execute();
+
+    return rows.map((row) => ({
+      eventId: String(row.event_id),
+      runId: row.run_id as RunId,
+      createdAt: toIso(row.ts),
+      kind: row.kind,
+      message: row.message,
+      data: (row.data ?? null) as JsonObject | null
+    }));
   }
 
   private mapRun(row: Selectable<DB["runs"]>): RunRecord {
