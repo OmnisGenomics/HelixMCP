@@ -1,7 +1,23 @@
 import type { ArtifactId, ProjectId, RunId } from "./ids.js";
 import type { JsonObject } from "./json.js";
 
-export type RunStatus = "queued" | "running" | "succeeded" | "failed" | "blocked";
+export const RUN_STATUSES = ["queued", "running", "succeeded", "failed", "blocked"] as const;
+
+export type RunStatus = (typeof RUN_STATUSES)[number];
+
+export const RUN_TERMINAL_STATUSES = ["succeeded", "failed", "blocked"] as const satisfies readonly RunStatus[];
+
+export const RUN_STATUS_TRANSITIONS: Record<RunStatus, readonly RunStatus[]> = {
+  queued: ["queued", "running", "succeeded", "failed", "blocked"],
+  running: ["running", "succeeded", "failed", "blocked"],
+  succeeded: ["succeeded"],
+  failed: ["failed"],
+  blocked: ["blocked"]
+};
+
+export function canTransitionRunStatus(from: RunStatus, to: RunStatus): boolean {
+  return RUN_STATUS_TRANSITIONS[from].includes(to);
+}
 
 export interface RunRecord {
   runId: RunId;

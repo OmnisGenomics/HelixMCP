@@ -35,7 +35,7 @@ export class ArtifactService {
 
     const putResult =
       input.source.kind === "inline_text"
-        ? await this.objects.putInlineText(artifactId, input.source.text)
+        ? await this.objects.putInlineText(artifactId, input.source.text, input.maxBytes)
         : await this.objects.putFromLocalPath(artifactId, input.source.path, input.maxBytes);
 
     const mimeType = mimeTypeForArtifactType(inferredType);
