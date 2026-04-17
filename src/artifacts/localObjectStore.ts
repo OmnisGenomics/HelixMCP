@@ -29,9 +29,12 @@ export class LocalObjectStore {
     return path.join(this.rootDir, artifactId);
   }
 
-  async putInlineText(artifactId: ArtifactId, text: string): Promise<PutResult> {
+  async putInlineText(artifactId: ArtifactId, text: string, maxBytes: bigint | null = null): Promise<PutResult> {
     await this.init();
     const bytes = Buffer.from(text, "utf8");
+    if (maxBytes !== null && BigInt(bytes.byteLength) > maxBytes) {
+      throw new ImportTooLargeError(`import exceeds max_bytes=${maxBytes.toString()}`);
+    }
     const checksumSha256 = `sha256:${createHash("sha256").update(bytes).digest("hex")}` as const;
     const objectPath = this.objectPath(artifactId);
     await fs.writeFile(objectPath, bytes);
