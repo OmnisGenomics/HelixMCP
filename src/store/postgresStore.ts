@@ -1,7 +1,7 @@
 import type { Kysely, Selectable } from "kysely";
 import type { ArtifactRecord, ArtifactType } from "../core/artifact.js";
 import type { JsonObject } from "../core/json.js";
-import type { RunRecord, RunStatus } from "../core/run.js";
+import { canTransitionRunStatus, type RunRecord, type RunStatus } from "../core/run.js";
 import type { ArtifactId, ProjectId, RunId } from "../core/ids.js";
 import type { DB } from "../db/types.js";
 
@@ -257,16 +257,7 @@ export class PostgresStore {
 
       const from = current.status;
       const to = patch.status;
-      const allowed: Record<RunStatus, RunStatus[]> = {
-        queued: ["queued", "running", "succeeded", "failed", "blocked"],
-        running: ["running", "succeeded", "failed", "blocked"],
-        succeeded: ["succeeded"],
-        failed: ["failed"],
-        blocked: ["blocked"]
-      };
-
-      const ok = allowed[from]?.includes(to) ?? false;
-      if (!ok) {
+      if (!canTransitionRunStatus(from, to)) {
         throw new Error(`invalid run status transition: ${from} -> ${to} for run ${runId}`);
       }
     }
