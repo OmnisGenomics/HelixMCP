@@ -5,6 +5,7 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 
 import { PolicyEngine } from "../src/policy/policy.js";
 import { builtinToolDefinitions } from "../src/toolpacks/builtin/index.js";
+import { zArtifactListInput } from "../src/mcp/toolSchemas.js";
 
 async function readJson(filePath: string): Promise<Record<string, unknown>> {
   return JSON.parse(await readFile(filePath, "utf8")) as Record<string, unknown>;
@@ -68,5 +69,13 @@ describe("published JSON contracts", () => {
         `missing published input contract for builtin toolpack ${tool.toolName}.${tool.contractVersion}`
       ).toBe(true);
     }
+  });
+
+  it("keeps artifact_list input contract aligned with runtime top-level parameters", async () => {
+    const schema = await readJson(path.resolve("contracts/tools/artifact_list.v1.schema.json"));
+    const publishedKeys = Object.keys((schema.properties ?? {}) as Record<string, unknown>).sort();
+    const runtimeKeys = Object.keys(zArtifactListInput.shape).sort();
+
+    expect(publishedKeys).toEqual(runtimeKeys);
   });
 });
