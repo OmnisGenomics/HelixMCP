@@ -1,0 +1,29 @@
+{
+  "repository": "HelixMCP",
+  "summary": "Governed BioMCP fabric gateway for policy-gated bioinformatics tool execution, artifact provenance, run capture, Slurm/Docker backends, and offline audit bundles.",
+  "public_interfaces": [
+    {
+      "id": "helixmcp-gateway",
+      "name": "HelixMCP Gateway",
+      "kind": "mcp-server",
+      "surfaces": [
+        "src/index.ts",
+        "src/mcp/gatewayServer.ts",
+        "src/mcp/toolSchemas.ts",
+        "src/toolpacks/register.ts",
+        "src/policy/policy.ts",
+        "src/bundle/bundleExport.ts",
+        "docs/architecture.md",
+        "docs/bundle_export.md"
+      ]
+    }
+  ],
+  "nix_discovery": {
+    "validation_commands": [
+      "npm run build",
+      "npm run typecheck",
+      "npm test",
+      "npm run bundle:verify"
+    ]
+  }
+}
