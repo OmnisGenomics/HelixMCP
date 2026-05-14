@@ -14,6 +14,7 @@ export function detectArtifactType(filenameOrLabel: string): ArtifactType {
   if (s.endsWith(".md") || s.endsWith(".markdown")) return "MD";
   if (s.endsWith(".html") || s.endsWith(".htm")) return "HTML";
   if (s.endsWith(".pdf")) return "PDF";
+  if (s.endsWith(".png")) return "PNG";
   if (s.endsWith(".log")) return "LOG";
   if (s.endsWith(".txt")) return "TEXT";
   return "UNKNOWN";

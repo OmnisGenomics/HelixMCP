@@ -6,13 +6,14 @@ import type { ArtifactRecord } from "../core/artifact.js";
 import type { ArtifactType } from "../core/artifact.js";
 import type { ArtifactId, ProjectId, RunId } from "../core/ids.js";
 import type { JsonObject } from "../core/json.js";
-import { sha256Prefixed } from "../core/canonicalJson.js";
+import { sha256Prefixed, stableJsonStringify } from "../core/canonicalJson.js";
 import type { ArtifactService } from "../artifacts/artifactService.js";
 import type { PostgresStore } from "../store/postgresStore.js";
 import type { PolicyEngine } from "../policy/policy.js";
 import type { ExecutionService } from "../execution/executionService.js";
 import { ToolRun, requestedByFromExtra } from "../runs/toolRun.js";
 import { deriveRunId } from "../runs/runIdentity.js";
+import { newRunId } from "../core/ids.js";
 import { ImportTooLargeError } from "../artifacts/localObjectStore.js";
 import { createRunWorkspace, safeJoin } from "../execution/workspace.js";
 import { renderSlurmScriptV1, type SlurmJobSpecV1 } from "../execution/slurm/slurmScriptV1.js";
@@ -23,6 +24,7 @@ import { SystemSlurmScheduler } from "../execution/slurm/scheduler.js";
 import { envSnapshot } from "./envSnapshot.js";
 import { registerToolDefinitions } from "../toolpacks/register.js";
 import { builtinToolDefinitions } from "../toolpacks/builtin/index.js";
+import { callStudioBridge } from "./studioBridgeClient.js";
 import {
   zArtifactGetInput,
   zArtifactGetOutput,
@@ -30,12 +32,28 @@ import {
   zArtifactImportOutput,
   zArtifactListInput,
   zArtifactListOutput,
+  zArtifactPreviewImageInput,
+  zArtifactPreviewImageOutput,
   zArtifactPreviewTextInput,
   zArtifactPreviewTextOutput,
   zDockerJobGetInput,
   zDockerJobGetOutput,
   zExportNextflowInput,
   zExportNextflowOutput,
+  zStudioCaptureScreenshotInput,
+  zStudioCaptureScreenshotOutput,
+  zStudioClearCompareInput,
+  zStudioClearCompareOutput,
+  zStudioGetStateInput,
+  zStudioGetStateOutput,
+  zStudioLoadEvsInput,
+  zStudioLoadEvsOutput,
+  zStudioOpenTabInput,
+  zStudioOpenTabOutput,
+  zStudioResetLayoutInput,
+  zStudioResetLayoutOutput,
+  zStudioVisualizationEditInput,
+  zStudioVisualizationEditOutput,
   zSlurmJobCollectInput,
   zSlurmJobCollectOutput,
   zSlurmJobGetInput,
@@ -57,6 +75,11 @@ export interface GatewayDeps {
   slurmSubmitter?: SlurmSubmitter;
   slurmScheduler?: SlurmScheduler;
 }
+
+type ToolExtra = {
+  authInfo?: { clientId: string; extra?: Record<string, unknown> } | undefined;
+  sessionId?: string | undefined;
+};
 
 function toArtifactSummary(a: ArtifactRecord): JsonObject {
   return {
@@ -96,9 +119,74 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
 	    "TEXT",
 	    "HTML",
 	    "PDF",
+	    "PNG",
 	    "LOG",
 	    "UNKNOWN"
 	  ]);
+  const STUDIO_BRIDGE_PROJECT_ID = "proj_01ARZ3NDEKTSV4RRFFQ69G5FAV" as ProjectId;
+
+  function studioBridgeOptions(bridgeFile?: string, timeoutMs?: number): { bridgeFile?: string; timeoutMs?: number } {
+    const options: { bridgeFile?: string; timeoutMs?: number } = {};
+    if (bridgeFile) options.bridgeFile = bridgeFile;
+    if (timeoutMs !== undefined) options.timeoutMs = timeoutMs;
+    return options;
+  }
+
+  async function runStudioInteractiveTool(
+    toolName: string,
+    canonicalParams: JsonObject,
+    extra: ToolExtra,
+    runFn: (toolRun: ToolRun) => Promise<JsonObject>
+  ): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: JsonObject }> {
+    let toolRun: ToolRun | null = null;
+    let started = false;
+
+    try {
+      deps.policy.assertToolAllowed(toolName);
+
+      toolRun = new ToolRun(
+        { store: deps.store, artifacts: deps.artifacts },
+        {
+          // Live Studio edits are session-scoped side effects, so they should always execute
+          // instead of short-circuiting through deterministic replay.
+          runId: newRunId(),
+          projectId: STUDIO_BRIDGE_PROJECT_ID,
+          toolName,
+          contractVersion: "v1",
+          toolVersion: "interactive_v1",
+          paramsHash: sha256Prefixed(stableJsonStringify(canonicalParams)),
+          canonicalParams,
+          policyHash: deps.policy.policyHash,
+          requestedBy: requestedByFromExtra(extra),
+          policySnapshot: deps.policy.snapshot() as JsonObject,
+          environment: envSnapshot()
+        }
+      );
+
+      await toolRun.start();
+      started = true;
+      const result = await runFn(toolRun);
+      const structured = await toolRun.finishSuccess(result, "studio bridge ok");
+      return {
+        content: [{ type: "text", text: `${toolName} ok` }],
+        structuredContent: structured
+      };
+    } catch (e) {
+      if (e instanceof McpError) {
+        if (toolRun && started) {
+          if (e.code === ErrorCode.InvalidRequest || e.code === ErrorCode.InvalidParams) await toolRun.finishBlocked(e.message);
+          else await toolRun.finishFailure(e.message);
+        }
+        throw e;
+      }
+      if (e instanceof Error) {
+        if (toolRun && started) await toolRun.finishFailure(e.message);
+        throw new McpError(ErrorCode.InvalidRequest, e.message);
+      }
+      if (toolRun && started) await toolRun.finishFailure("unknown error");
+      throw new McpError(ErrorCode.InternalError, "unknown studio bridge error");
+    }
+  }
 
   function requireArtifactType(value: string): ArtifactType {
     if (ARTIFACT_TYPE_SET.has(value as ArtifactType)) return value as ArtifactType;
@@ -115,6 +203,274 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
     mcp,
     { policy: deps.policy, store: deps.store, artifacts: deps.artifacts, runsDir: deps.runsDir, slurmSubmitter },
     builtinToolDefinitions
+  );
+
+  mcp.registerTool(
+    "studio_get_state",
+    {
+      description: "Read state from a live local Helix Studio session through the local Studio MCP bridge.",
+      inputSchema: zStudioGetStateInput,
+      outputSchema: zStudioGetStateOutput
+    },
+    async (args, extra) =>
+      runStudioInteractiveTool(
+        "studio_get_state",
+        {
+          bridge_file: args.bridge_file ?? null
+        },
+        extra,
+        async (toolRun) => {
+          await toolRun.event("studio.command", "get_state", { bridge_file: args.bridge_file ?? null });
+          const raw = (await callStudioBridge("get_state", {}, studioBridgeOptions(args.bridge_file))) as any;
+          return {
+            bridge: raw.bridge,
+            studio_state: raw.state
+          };
+        }
+      )
+  );
+
+  mcp.registerTool(
+    "studio_open_tab",
+    {
+      description: "Switch the active Helix Studio center tab in a live local session.",
+      inputSchema: zStudioOpenTabInput,
+      outputSchema: zStudioOpenTabOutput
+    },
+    async (args, extra) =>
+      runStudioInteractiveTool(
+        "studio_open_tab",
+        {
+          bridge_file: args.bridge_file ?? null,
+          tab: args.tab
+        },
+        extra,
+        async (toolRun) => {
+          await toolRun.event("studio.command", "open_tab", { tab: args.tab });
+          const raw = (await callStudioBridge("open_tab", { tab: args.tab }, studioBridgeOptions(args.bridge_file))) as any;
+          return {
+            bridge: raw.bridge,
+            studio_state: raw.state
+          };
+        }
+      )
+  );
+
+  mcp.registerTool(
+    "studio_reset_layout",
+    {
+      description: "Reset the live Helix Studio window layout to defaults through the local Studio MCP bridge.",
+      inputSchema: zStudioResetLayoutInput,
+      outputSchema: zStudioResetLayoutOutput
+    },
+    async (args, extra) =>
+      runStudioInteractiveTool(
+        "studio_reset_layout",
+        {
+          bridge_file: args.bridge_file ?? null
+        },
+        extra,
+        async (toolRun) => {
+          await toolRun.event("studio.command", "reset_layout", {});
+          const raw = (await callStudioBridge("reset_layout", {}, studioBridgeOptions(args.bridge_file))) as any;
+          return {
+            bridge: raw.bridge,
+            studio_state: raw.state
+          };
+        }
+      )
+  );
+
+  mcp.registerTool(
+    "studio_load_evs",
+    {
+      description: "Load an EVS JSON file into the live Helix Studio session as the active or compare view.",
+      inputSchema: zStudioLoadEvsInput,
+      outputSchema: zStudioLoadEvsOutput
+    },
+    async (args, extra) =>
+      runStudioInteractiveTool(
+        "studio_load_evs",
+        {
+          bridge_file: args.bridge_file ?? null,
+          path: args.path,
+          role: args.role,
+          open_visualizations: args.open_visualizations,
+          set_compare_mode: args.set_compare_mode,
+          apply_layout_preset: args.apply_layout_preset,
+          focus_sidebars: args.focus_sidebars,
+          sync_lightcone: args.sync_lightcone
+        },
+        extra,
+        async (toolRun) => {
+          await toolRun.event("studio.command", "load_evs", {
+            path: args.path,
+            role: args.role
+          });
+          const raw = (await callStudioBridge(
+            "load_evs",
+            {
+              path: args.path,
+              role: args.role,
+              open_visualizations: args.open_visualizations,
+              set_compare_mode: args.set_compare_mode,
+              apply_layout_preset: args.apply_layout_preset,
+              focus_sidebars: args.focus_sidebars,
+              sync_lightcone: args.sync_lightcone
+            },
+            studioBridgeOptions(args.bridge_file, 15_000)
+          )) as any;
+          return {
+            bridge: raw.bridge,
+            studio_state: raw.state
+          };
+        }
+      )
+  );
+
+  mcp.registerTool(
+    "studio_clear_compare",
+    {
+      description: "Clear the live Helix Studio visualization compare payload.",
+      inputSchema: zStudioClearCompareInput,
+      outputSchema: zStudioClearCompareOutput
+    },
+    async (args, extra) =>
+      runStudioInteractiveTool(
+        "studio_clear_compare",
+        {
+          bridge_file: args.bridge_file ?? null
+        },
+        extra,
+        async (toolRun) => {
+          await toolRun.event("studio.command", "clear_compare", {});
+          const raw = (await callStudioBridge("clear_compare", {}, studioBridgeOptions(args.bridge_file))) as any;
+          return {
+            bridge: raw.bridge,
+            studio_state: raw.state
+          };
+        }
+      )
+  );
+
+  mcp.registerTool(
+    "studio_visualization_edit",
+    {
+      description:
+        "Apply live edits to the Helix Studio Visualizations tab: mode, editor profile, repair profile, chromatin profile, scale focus, and selected outcome.",
+      inputSchema: zStudioVisualizationEditInput,
+      outputSchema: zStudioVisualizationEditOutput
+    },
+    async (args, extra) =>
+      runStudioInteractiveTool(
+        "studio_visualization_edit",
+        {
+          bridge_file: args.bridge_file ?? null,
+          open_visualizations: args.open_visualizations,
+          mode: args.mode ?? null,
+          editor_profile: args.editor_profile ?? null,
+          repair_profile: args.repair_profile ?? null,
+          accessibility_profile: args.accessibility_profile ?? null,
+          selected_scale_id: args.selected_scale_id ?? null,
+          selected_outcome_label: args.selected_outcome_label ?? null
+        },
+        extra,
+        async (toolRun) => {
+          await toolRun.event("studio.command", "set_visualization_state", {
+            mode: args.mode ?? null,
+            editor_profile: args.editor_profile ?? null,
+            repair_profile: args.repair_profile ?? null,
+            accessibility_profile: args.accessibility_profile ?? null,
+            selected_scale_id: args.selected_scale_id ?? null,
+            selected_outcome_label: args.selected_outcome_label ?? null
+          });
+          const raw = (await callStudioBridge(
+            "set_visualization_state",
+            {
+              open_visualizations: args.open_visualizations,
+              mode: args.mode,
+              editor_profile: args.editor_profile,
+              repair_profile: args.repair_profile,
+              accessibility_profile: args.accessibility_profile,
+              selected_scale_id: args.selected_scale_id,
+              selected_outcome_label: args.selected_outcome_label
+            },
+            studioBridgeOptions(args.bridge_file)
+          )) as any;
+          return {
+            bridge: raw.bridge,
+            studio_state: raw.state
+          };
+        }
+      )
+  );
+
+  mcp.registerTool(
+    "studio_capture_screenshot",
+    {
+      description: "Capture the live Helix Studio window as a PNG so agents can inspect the GUI visually.",
+      inputSchema: zStudioCaptureScreenshotInput,
+      outputSchema: zStudioCaptureScreenshotOutput
+    },
+    async (args, extra) =>
+      runStudioInteractiveTool(
+        "studio_capture_screenshot",
+        {
+          bridge_file: args.bridge_file ?? null,
+          path: args.path ?? null,
+          tab: args.tab ?? null,
+          overwrite: args.overwrite
+        },
+        extra,
+        async (toolRun) => {
+          await toolRun.event("studio.command", "capture_screenshot", {
+            path: args.path ?? null,
+            tab: args.tab ?? null
+          });
+          const raw = (await callStudioBridge(
+            "capture_screenshot",
+            {
+              path: args.path,
+              tab: args.tab,
+              overwrite: args.overwrite
+            },
+            studioBridgeOptions(args.bridge_file, 15_000)
+          )) as any;
+
+          const rawScreenshotPath = String(raw.screenshot?.path || "").trim();
+          if (!rawScreenshotPath) {
+            throw new Error("studio bridge did not return a screenshot path");
+          }
+          const screenshotPath = path.resolve(rawScreenshotPath);
+          await assertRegularFileNoSymlink(screenshotPath, "studio screenshot");
+          const artifact = await deps.artifacts.importArtifact({
+            projectId: STUDIO_BRIDGE_PROJECT_ID,
+            source: { kind: "local_path", path: screenshotPath },
+            typeHint: "PNG",
+            label: path.basename(screenshotPath),
+            createdByRunId: toolRun.runId,
+            maxBytes: null
+          });
+          await toolRun.linkOutput(artifact.artifactId, "screenshot");
+          const preview = await deps.artifacts.previewPngMetadata(artifact.artifactId);
+
+          return {
+            bridge: raw.bridge,
+            studio_state: raw.state,
+            screenshot: {
+              path: screenshotPath,
+              artifact_id: artifact.artifactId,
+              format: preview.format,
+              width_px: preview.widthPx,
+              height_px: preview.heightPx,
+              device_pixel_ratio: Number(raw.screenshot?.device_pixel_ratio ?? 1),
+              size_bytes: artifact.sizeBytes.toString(),
+              checksum_sha256: artifact.checksumSha256,
+              captured_at: String(raw.screenshot?.captured_at || "")
+            }
+          };
+        }
+      )
   );
 
   mcp.registerTool(
@@ -999,6 +1355,110 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
         }
         if (toolRun && started) await toolRun.finishFailure("unknown error");
         throw new Error("unknown error");
+      }
+    }
+  );
+
+  mcp.registerTool(
+    "artifact_preview_image",
+    {
+      description: "Preview an image Artifact as deterministic metadata (currently PNG only).",
+      inputSchema: zArtifactPreviewImageInput,
+      outputSchema: zArtifactPreviewImageOutput
+    },
+    async (args, extra) => {
+      const toolName = "artifact_preview_image";
+      const contractVersion = "v1";
+      let toolRun: ToolRun | null = null;
+      let started = false;
+
+      try {
+        deps.policy.assertToolAllowed(toolName);
+
+        const artifact = await deps.artifacts.getArtifact(args.artifact_id as ArtifactId);
+        if (!artifact) throw new McpError(ErrorCode.InvalidParams, `unknown artifact_id: ${args.artifact_id}`);
+        if (artifact.type !== "PNG") {
+          throw new McpError(ErrorCode.InvalidRequest, `artifact_preview_image currently supports PNG artifacts only (got ${artifact.type})`);
+        }
+
+        const canonicalParams: JsonObject = {
+          artifact_id: artifact.artifactId,
+          type: artifact.type
+        };
+
+        const { runId, paramsHash } = deriveRunId({
+          toolName,
+          contractVersion,
+          policyHash: deps.policy.policyHash,
+          canonicalParams
+        });
+
+        const existing = await deps.store.getRun(runId);
+        if (existing?.status === "succeeded" && existing.resultJson) {
+          return {
+            content: [{ type: "text", text: `Replayed ${toolName} (${runId})` }],
+            structuredContent: existing.resultJson
+          };
+        }
+
+        toolRun = new ToolRun(
+          { store: deps.store, artifacts: deps.artifacts },
+          {
+            runId,
+            projectId: artifact.projectId,
+            toolName,
+            contractVersion,
+            toolVersion: "v1",
+            paramsHash,
+            canonicalParams,
+            policyHash: deps.policy.policyHash,
+            requestedBy: requestedByFromExtra(extra),
+            policySnapshot: deps.policy.snapshot() as JsonObject,
+            environment: envSnapshot()
+          }
+        );
+
+        await toolRun.start("queued");
+        started = true;
+        await toolRun.linkInput(artifact.artifactId, "artifact");
+
+        const preview = await deps.artifacts.previewPngMetadata(artifact.artifactId);
+        const structured = await toolRun.finishSuccess(
+          {
+            artifact_id: artifact.artifactId,
+            format: preview.format,
+            width_px: preview.widthPx,
+            height_px: preview.heightPx,
+            bit_depth: preview.bitDepth,
+            color_type_code: preview.colorTypeCode,
+            color_type: preview.colorType,
+            channel_count: preview.channelCount,
+            has_alpha: preview.hasAlpha,
+            interlaced: preview.interlaced,
+            compression_method: preview.compressionMethod,
+            filter_method: preview.filterMethod
+          },
+          `${preview.format} ${preview.widthPx}x${preview.heightPx}`
+        );
+
+        return {
+          content: [{ type: "text", text: `${preview.format} ${preview.widthPx}x${preview.heightPx} ${preview.colorType} ${preview.bitDepth}-bit` }],
+          structuredContent: structured
+        };
+      } catch (e) {
+        if (e instanceof McpError) {
+          if (toolRun && started) {
+            if (e.code === ErrorCode.InvalidRequest) await toolRun.finishBlocked(e.message);
+            else await toolRun.finishFailure(e.message);
+          }
+          throw e;
+        }
+        if (e instanceof Error) {
+          if (toolRun && started) await toolRun.finishFailure(e.message);
+          throw e;
+        }
+        if (toolRun && started) await toolRun.finishFailure("unknown error");
+        throw e;
       }
     }
   );

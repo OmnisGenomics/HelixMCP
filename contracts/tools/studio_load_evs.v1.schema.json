@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:studio_load_evs:v1",
+  "title": "studio_load_evs input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["path"],
+  "properties": {
+    "bridge_file": { "type": "string", "minLength": 1 },
+    "path": { "type": "string", "minLength": 1 },
+    "role": { "type": "string", "enum": ["primary", "compare"], "default": "primary" },
+    "open_visualizations": { "type": "boolean", "default": true },
+    "set_compare_mode": { "type": "boolean", "default": true },
+    "apply_layout_preset": { "type": "boolean", "default": false },
+    "focus_sidebars": { "type": "boolean", "default": false },
+    "sync_lightcone": { "type": "boolean", "default": false }
+  }
+}

@@ -4,6 +4,7 @@ import type { ArtifactId, ProjectId, RunId } from "../core/ids.js";
 import { newArtifactId } from "../core/ids.js";
 import type { JsonObject } from "../core/json.js";
 import { mimeTypeForArtifactType } from "../core/mimeType.js";
+import type { PngMetadata } from "../core/pngMetadata.js";
 import type { PostgresStore } from "../store/postgresStore.js";
 import type { LocalObjectStore } from "./localObjectStore.js";
 
@@ -71,6 +72,10 @@ export class ArtifactService {
 
   async previewText(artifactId: ArtifactId, opts: { maxBytes: number; maxLines: number }): Promise<{ preview: string; truncated: boolean }> {
     return this.objects.readTextPreview(artifactId, opts);
+  }
+
+  async previewPngMetadata(artifactId: ArtifactId): Promise<PngMetadata> {
+    return this.objects.readPngMetadata(artifactId);
   }
 
   async materializeToPath(artifactId: ArtifactId, destPath: string): Promise<void> {

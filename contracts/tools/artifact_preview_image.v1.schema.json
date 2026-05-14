@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:artifact_preview_image:v1",
+  "title": "artifact_preview_image input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["artifact_id"],
+  "properties": {
+    "artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" }
+  }
+}

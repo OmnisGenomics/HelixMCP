@@ -21,6 +21,7 @@ export const zArtifactType = z.enum([
   "TEXT",
   "HTML",
   "PDF",
+  "PNG",
   "LOG",
   "UNKNOWN"
 ]);
@@ -88,6 +89,26 @@ export const zArtifactPreviewTextOutput = zProvenance.extend({
   artifact_id: zArtifactId,
   preview: z.string(),
   truncated: z.boolean(),
+  log_artifact_id: zArtifactId
+});
+
+export const zArtifactPreviewImageInput = z.object({
+  artifact_id: zArtifactId
+});
+
+export const zArtifactPreviewImageOutput = zProvenance.extend({
+  artifact_id: zArtifactId,
+  format: z.literal("PNG"),
+  width_px: z.number().int().positive(),
+  height_px: z.number().int().positive(),
+  bit_depth: z.number().int().min(1).max(16),
+  color_type_code: z.number().int().min(0).max(6),
+  color_type: z.enum(["grayscale", "rgb", "indexed", "grayscale_alpha", "rgba"]),
+  channel_count: z.number().int().min(1).max(4),
+  has_alpha: z.boolean(),
+  interlaced: z.boolean(),
+  compression_method: z.number().int().min(0).max(255),
+  filter_method: z.number().int().min(0).max(255),
   log_artifact_id: zArtifactId
 });
 
@@ -514,5 +535,137 @@ export const zDockerJobGetOutput = zProvenance.extend({
     started_at: z.string().nullable(),
     finished_at: z.string().nullable()
   }),
+  log_artifact_id: zArtifactId
+});
+
+export const zStudioBridgeInfo = z.object({
+  bridge_file: z.string().min(1),
+  host: z.string().min(1),
+  port: z.number().int().min(1).max(65535),
+  pid: z.number().int().positive(),
+  session_id: z.string().min(1),
+  started_at: z.string().min(1),
+  project_root: z.string().min(1).optional()
+});
+
+export const zStudioVisualizationState = z.object({
+  mode: z.enum(["explore", "compare", "verify"]).nullable(),
+  editor_profile: z.enum(["spcas9", "hifi", "prime"]).nullable(),
+  repair_profile: z.enum(["balanced", "precise", "indel_bias"]).nullable(),
+  accessibility_profile: z.enum(["constrained", "baseline", "open"]).nullable(),
+  selected_scale_id: z.enum(["sequence", "complex", "cell", "tissue", "population"]).nullable(),
+  selected_outcome_label: z.string().nullable(),
+  available_outcomes: z.array(z.string()),
+  compare_loaded: z.boolean(),
+  run_id: z.string().nullable(),
+  run_label: z.string().nullable()
+});
+
+export const zStudioState = z.object({
+  current_tab: z.string().nullable(),
+  available_tabs: z.array(z.string()),
+  active_run_id: z.string().nullable(),
+  project_root: z.string().nullable(),
+  visualization: zStudioVisualizationState.nullable()
+});
+
+export const zStudioScreenshot = z.object({
+  path: z.string().min(1),
+  artifact_id: zArtifactId,
+  format: z.literal("PNG"),
+  width_px: z.number().int().positive(),
+  height_px: z.number().int().positive(),
+  device_pixel_ratio: z.number().positive(),
+  size_bytes: z.string(),
+  checksum_sha256: zSha256,
+  captured_at: z.string().min(1)
+});
+
+export const zStudioGetStateInput = z.object({
+  bridge_file: z.string().min(1).optional()
+});
+
+export const zStudioGetStateOutput = zProvenance.extend({
+  bridge: zStudioBridgeInfo,
+  studio_state: zStudioState,
+  log_artifact_id: zArtifactId
+});
+
+export const zStudioOpenTabInput = z.object({
+  bridge_file: z.string().min(1).optional(),
+  tab: z.string().min(1).max(64)
+});
+
+export const zStudioOpenTabOutput = zProvenance.extend({
+  bridge: zStudioBridgeInfo,
+  studio_state: zStudioState,
+  log_artifact_id: zArtifactId
+});
+
+export const zStudioResetLayoutInput = z.object({
+  bridge_file: z.string().min(1).optional()
+});
+
+export const zStudioResetLayoutOutput = zProvenance.extend({
+  bridge: zStudioBridgeInfo,
+  studio_state: zStudioState,
+  log_artifact_id: zArtifactId
+});
+
+export const zStudioLoadEvsInput = z.object({
+  bridge_file: z.string().min(1).optional(),
+  path: z.string().min(1),
+  role: z.enum(["primary", "compare"]).default("primary"),
+  open_visualizations: z.boolean().default(true),
+  set_compare_mode: z.boolean().default(true),
+  apply_layout_preset: z.boolean().default(false),
+  focus_sidebars: z.boolean().default(false),
+  sync_lightcone: z.boolean().default(false)
+});
+
+export const zStudioLoadEvsOutput = zProvenance.extend({
+  bridge: zStudioBridgeInfo,
+  studio_state: zStudioState,
+  log_artifact_id: zArtifactId
+});
+
+export const zStudioClearCompareInput = z.object({
+  bridge_file: z.string().min(1).optional()
+});
+
+export const zStudioClearCompareOutput = zProvenance.extend({
+  bridge: zStudioBridgeInfo,
+  studio_state: zStudioState,
+  log_artifact_id: zArtifactId
+});
+
+export const zStudioVisualizationEditInput = z.object({
+  bridge_file: z.string().min(1).optional(),
+  open_visualizations: z.boolean().default(true),
+  mode: z.enum(["explore", "compare", "verify"]).optional(),
+  editor_profile: z.enum(["spcas9", "hifi", "prime"]).optional(),
+  repair_profile: z.enum(["balanced", "precise", "indel_bias"]).optional(),
+  accessibility_profile: z.enum(["constrained", "baseline", "open"]).optional(),
+  selected_scale_id: z.enum(["sequence", "complex", "cell", "tissue", "population"]).optional(),
+  selected_outcome_label: z.string().min(1).optional()
+});
+
+export const zStudioVisualizationEditOutput = zProvenance.extend({
+  bridge: zStudioBridgeInfo,
+  studio_state: zStudioState,
+  log_artifact_id: zArtifactId
+});
+
+export const zStudioCaptureScreenshotInput = z.object({
+  bridge_file: z.string().min(1).optional(),
+  path: z.string().min(1).optional(),
+  tab: z.string().min(1).max(64).optional(),
+  overwrite: z.boolean().default(false)
+});
+
+export const zStudioCaptureScreenshotOutput = zProvenance.extend({
+  bridge: zStudioBridgeInfo,
+  studio_state: zStudioState,
+  screenshot: zStudioScreenshot,
   log_artifact_id: zArtifactId
 });

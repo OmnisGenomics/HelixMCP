@@ -13,6 +13,7 @@ tool_allowlist:
   - artifact_get
   - artifact_list
   - artifact_preview_text
+  - artifact_preview_image
   - docker_job_get
   - simulate_qc_fastq
   - simulate_align_reads
@@ -22,6 +23,13 @@ tool_allowlist:
   - multiqc
   - qc_bundle_fastq
   - export_nextflow
+  - studio_get_state
+  - studio_open_tab
+  - studio_reset_layout
+  - studio_load_evs
+  - studio_clear_compare
+  - studio_visualization_edit
+  - studio_capture_screenshot
 
 quotas:
   max_threads: 16

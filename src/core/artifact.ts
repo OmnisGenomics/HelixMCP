@@ -15,6 +15,7 @@ export type ArtifactType =
   | "TEXT"
   | "HTML"
   | "PDF"
+  | "PNG"
   | "LOG"
   | "UNKNOWN";
 

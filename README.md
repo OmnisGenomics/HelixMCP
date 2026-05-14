@@ -3,6 +3,7 @@
 Governed, reproducible MCP gateway skeleton for bioinformatics compute + database tooling:
 
 - Artifact-first data model (handles, metadata, previews)
+- PNG artifacts recognized as `image/png` with deterministic header preview metadata
 - Policy-gated tool calls (allowlists + quotas)
 - Run/provenance capture (inputs, outputs, logs, checksums)
 - Docker execution backend (read-only rootfs, no network by default)

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:studio_get_state:v1",
+  "title": "studio_get_state input",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "bridge_file": { "type": "string", "minLength": 1 }
+  }
+}

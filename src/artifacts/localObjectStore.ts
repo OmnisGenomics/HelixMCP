@@ -4,6 +4,7 @@ import path from "path";
 import { Transform } from "stream";
 import { pipeline } from "stream/promises";
 import type { ArtifactId } from "../core/ids.js";
+import { PNG_IHDR_BYTES, parsePngMetadata, type PngMetadata } from "../core/pngMetadata.js";
 
 export interface PutResult {
   uri: string;
@@ -90,6 +91,18 @@ export class LocalObjectStore {
       const truncatedByLines = lines.length > opts.maxLines;
 
       return { preview: limited, truncated: truncatedByBytes || truncatedByLines };
+    } finally {
+      await fd.close();
+    }
+  }
+
+  async readPngMetadata(artifactId: ArtifactId): Promise<PngMetadata> {
+    const objectPath = this.objectPath(artifactId);
+    const fd = await fs.open(objectPath, "r");
+    try {
+      const buffer = Buffer.alloc(PNG_IHDR_BYTES);
+      const { bytesRead } = await fd.read(buffer, 0, PNG_IHDR_BYTES, 0);
+      return parsePngMetadata(buffer.subarray(0, bytesRead));
     } finally {
       await fd.close();
     }

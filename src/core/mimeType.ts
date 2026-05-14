@@ -10,6 +10,8 @@ export function mimeTypeForArtifactType(type: ArtifactType): string {
       return "text/html";
     case "PDF":
       return "application/pdf";
+    case "PNG":
+      return "image/png";
     case "ZIP":
       return "application/zip";
     case "MD":

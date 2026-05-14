@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:studio_visualization_edit:v1",
+  "title": "studio_visualization_edit input",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "bridge_file": { "type": "string", "minLength": 1 },
+    "open_visualizations": { "type": "boolean", "default": true },
+    "mode": { "type": "string", "enum": ["explore", "compare", "verify"] },
+    "editor_profile": { "type": "string", "enum": ["spcas9", "hifi", "prime"] },
+    "repair_profile": { "type": "string", "enum": ["balanced", "precise", "indel_bias"] },
+    "accessibility_profile": { "type": "string", "enum": ["constrained", "baseline", "open"] },
+    "selected_scale_id": { "type": "string", "enum": ["sequence", "complex", "cell", "tissue", "population"] },
+    "selected_outcome_label": { "type": "string", "minLength": 1 }
+  }
+}

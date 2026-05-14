@@ -44,9 +44,95 @@
         "TEXT",
         "HTML",
         "PDF",
+        "PNG",
         "LOG",
         "UNKNOWN"
       ]
+    },
+    "StudioBridgeInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bridge_file", "host", "port", "pid", "session_id", "started_at"],
+      "properties": {
+        "bridge_file": { "type": "string", "minLength": 1 },
+        "host": { "type": "string", "minLength": 1 },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "pid": { "type": "integer", "minimum": 1 },
+        "session_id": { "type": "string", "minLength": 1 },
+        "started_at": { "type": "string", "minLength": 1 },
+        "project_root": { "type": "string", "minLength": 1 }
+      }
+    },
+    "StudioVisualizationState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "editor_profile",
+        "repair_profile",
+        "accessibility_profile",
+        "selected_scale_id",
+        "selected_outcome_label",
+        "available_outcomes",
+        "compare_loaded",
+        "run_id",
+        "run_label"
+      ],
+      "properties": {
+        "mode": { "type": ["string", "null"], "enum": ["explore", "compare", "verify", null] },
+        "editor_profile": { "type": ["string", "null"], "enum": ["spcas9", "hifi", "prime", null] },
+        "repair_profile": { "type": ["string", "null"], "enum": ["balanced", "precise", "indel_bias", null] },
+        "accessibility_profile": { "type": ["string", "null"], "enum": ["constrained", "baseline", "open", null] },
+        "selected_scale_id": {
+          "type": ["string", "null"],
+          "enum": ["sequence", "complex", "cell", "tissue", "population", null]
+        },
+        "selected_outcome_label": { "type": ["string", "null"] },
+        "available_outcomes": { "type": "array", "items": { "type": "string" } },
+        "compare_loaded": { "type": "boolean" },
+        "run_id": { "type": ["string", "null"] },
+        "run_label": { "type": ["string", "null"] }
+      }
+    },
+    "StudioState": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["current_tab", "available_tabs", "active_run_id", "project_root", "visualization"],
+      "properties": {
+        "current_tab": { "type": ["string", "null"] },
+        "available_tabs": { "type": "array", "items": { "type": "string" } },
+        "active_run_id": { "type": ["string", "null"] },
+        "project_root": { "type": ["string", "null"] },
+        "visualization": {
+          "anyOf": [{ "$ref": "helixmcp:common#/$defs/StudioVisualizationState" }, { "type": "null" }]
+        }
+      }
+    },
+    "StudioScreenshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "artifact_id",
+        "format",
+        "width_px",
+        "height_px",
+        "device_pixel_ratio",
+        "size_bytes",
+        "checksum_sha256",
+        "captured_at"
+      ],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" },
+        "format": { "const": "PNG" },
+        "width_px": { "type": "integer", "minimum": 1 },
+        "height_px": { "type": "integer", "minimum": 1 },
+        "device_pixel_ratio": { "type": "number", "exclusiveMinimum": 0 },
+        "size_bytes": { "type": "string" },
+        "checksum_sha256": { "$ref": "helixmcp:common#/$defs/Sha256" },
+        "captured_at": { "type": "string", "minLength": 1 }
+      }
     }
   }
 }

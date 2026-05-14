@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:studio_capture_screenshot:v1",
+  "title": "studio_capture_screenshot input",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "bridge_file": { "type": "string", "minLength": 1 },
+    "path": { "type": "string", "minLength": 1 },
+    "tab": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "overwrite": { "type": "boolean", "default": false }
+  }
+}

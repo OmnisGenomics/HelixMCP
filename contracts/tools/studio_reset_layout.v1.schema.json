@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:studio_reset_layout:v1",
+  "title": "studio_reset_layout input",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "bridge_file": { "type": "string", "minLength": 1 }
+  }
+}

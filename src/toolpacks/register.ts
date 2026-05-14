@@ -29,6 +29,7 @@ const ARTIFACT_TYPES: Set<ArtifactType> = new Set<ArtifactType>([
   "TEXT",
   "HTML",
   "PDF",
+  "PNG",
   "LOG",
   "UNKNOWN"
 ]);

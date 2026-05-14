@@ -92,6 +92,7 @@ describe.sequential("gateway (in-memory)", () => {
     const result = await client.request({ method: "tools/list", params: {} }, ListToolsResultSchema);
     const names = new Set(result.tools.map((t) => t.name));
     expect(names.has("artifact_import")).toBe(true);
+    expect(names.has("artifact_preview_image")).toBe(true);
     expect(names.has("simulate_align_reads")).toBe(true);
   });
 
@@ -138,6 +139,53 @@ describe.sequential("gateway (in-memory)", () => {
     const previewSc = preview.structuredContent as any;
     expect(previewSc.preview).toContain("hello");
     expect(previewSc.preview).toContain("world");
+  });
+
+  it("imports a PNG artifact and previews image metadata", async () => {
+    const projectId = newProjectId();
+    const pngPath = path.join(tmpDir, "tiny.png");
+    const pngBytes = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4//8/AwAI/AL+KDgHAAAAAElFTkSuQmCC",
+      "base64"
+    );
+    await writeFile(pngPath, pngBytes);
+
+    const imported = await callTool("artifact_import", {
+      project_id: projectId,
+      label: "tiny.png",
+      source: { kind: "local_path", path: pngPath }
+    });
+
+    if (imported.isError) {
+      throw new Error(
+        `artifact_import failed: ${imported.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+      );
+    }
+
+    const importedSc = imported.structuredContent as any;
+    expect(importedSc.artifact.type).toBe("PNG");
+    expect(importedSc.artifact.mime_type).toBe("image/png");
+
+    const preview = await callTool("artifact_preview_image", { artifact_id: importedSc.artifact.artifact_id });
+    if (preview.isError) {
+      throw new Error(
+        `artifact_preview_image failed: ${preview.content.map((c) => (c.type === "text" ? c.text : c.type)).join("\n")}`
+      );
+    }
+
+    const previewSc = preview.structuredContent as any;
+    expect(previewSc.artifact_id).toBe(importedSc.artifact.artifact_id);
+    expect(previewSc.format).toBe("PNG");
+    expect(previewSc.width_px).toBe(1);
+    expect(previewSc.height_px).toBe(1);
+    expect(previewSc.bit_depth).toBe(8);
+    expect(previewSc.color_type_code).toBe(6);
+    expect(previewSc.color_type).toBe("rgba");
+    expect(previewSc.channel_count).toBe(4);
+    expect(previewSc.has_alpha).toBe(true);
+    expect(previewSc.interlaced).toBe(false);
+    expect(previewSc.compression_method).toBe(0);
+    expect(previewSc.filter_method).toBe(0);
   });
 
   it("lists artifacts deterministically with snapshot replay", async () => {

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:artifact_preview_image:out:v1",
+  "title": "artifact_preview_image output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "provenance_run_id",
+    "artifact_id",
+    "format",
+    "width_px",
+    "height_px",
+    "bit_depth",
+    "color_type_code",
+    "color_type",
+    "channel_count",
+    "has_alpha",
+    "interlaced",
+    "compression_method",
+    "filter_method",
+    "log_artifact_id"
+  ],
+  "properties": {
+    "provenance_run_id": { "$ref": "helixmcp:common#/$defs/RunId" },
+    "artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" },
+    "format": { "const": "PNG" },
+    "width_px": { "type": "integer", "minimum": 1 },
+    "height_px": { "type": "integer", "minimum": 1 },
+    "bit_depth": { "type": "integer", "minimum": 1, "maximum": 16 },
+    "color_type_code": { "type": "integer", "minimum": 0, "maximum": 6 },
+    "color_type": {
+      "type": "string",
+      "enum": ["grayscale", "rgb", "indexed", "grayscale_alpha", "rgba"]
+    },
+    "channel_count": { "type": "integer", "minimum": 1, "maximum": 4 },
+    "has_alpha": { "type": "boolean" },
+    "interlaced": { "type": "boolean" },
+    "compression_method": { "type": "integer", "minimum": 0, "maximum": 255 },
+    "filter_method": { "type": "integer", "minimum": 0, "maximum": 255 },
+    "log_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" }
+  }
+}

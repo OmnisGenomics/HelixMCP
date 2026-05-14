@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:studio_capture_screenshot:out:v1",
+  "title": "studio_capture_screenshot output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["provenance_run_id", "bridge", "studio_state", "screenshot", "log_artifact_id"],
+  "properties": {
+    "provenance_run_id": { "$ref": "helixmcp:common#/$defs/RunId" },
+    "bridge": { "$ref": "helixmcp:common#/$defs/StudioBridgeInfo" },
+    "studio_state": { "$ref": "helixmcp:common#/$defs/StudioState" },
+    "screenshot": { "$ref": "helixmcp:common#/$defs/StudioScreenshot" },
+    "log_artifact_id": { "$ref": "helixmcp:common#/$defs/ArtifactId" }
+  }
+}
