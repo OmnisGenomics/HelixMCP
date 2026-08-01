@@ -25,6 +25,12 @@ npm test
 HELIXMCP_TEST_DOCKER=1 npm test
 ```
 
+## Nix CI
+
+`nix flake check` builds HelixMCP and runs the TypeScript typecheck plus the
+default Vitest suite. `.github/workflows/ci.yml` calls the shared Omnis Nix CI
+workflow on pushes to `master` and manual dispatch.
+
 ## Hybrid toolpack example (Docker or Slurm)
 
 - `samtools_flagstat` supports `backend: "docker" | "slurm"` (default via policy; falls back to `"docker"`).
