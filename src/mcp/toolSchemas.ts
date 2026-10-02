@@ -578,7 +578,8 @@ export const zStudioScreenshot = z.object({
   device_pixel_ratio: z.number().positive(),
   size_bytes: z.string(),
   checksum_sha256: zSha256,
-  captured_at: z.string().min(1)
+  captured_at: z.string().min(1),
+  target: z.record(z.string(), z.unknown()).nullable().optional()
 });
 
 export const zStudioGetStateInput = z.object({
@@ -660,6 +661,7 @@ export const zStudioCaptureScreenshotInput = z.object({
   bridge_file: z.string().min(1).optional(),
   path: z.string().min(1).optional(),
   tab: z.string().min(1).max(64).optional(),
+  target: z.enum(["main", "studio", "window", "modal", "active_modal", "active", "active_window", "native", "native_window", "active_native", "screen", "desktop", "pilot_review"]).optional(),
   overwrite: z.boolean().default(false)
 });
 

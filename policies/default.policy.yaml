@@ -30,6 +30,12 @@ tool_allowlist:
   - studio_clear_compare
   - studio_visualization_edit
   - studio_capture_screenshot
+  - studio_pilot_review_get_state
+  - studio_pilot_review_open
+  - studio_pilot_review_start
+  - studio_pilot_review_fill
+  - studio_pilot_review_view
+  - studio_pilot_review_export
 
 quotas:
   max_threads: 16

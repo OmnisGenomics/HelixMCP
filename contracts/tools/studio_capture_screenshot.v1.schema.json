@@ -5,9 +5,40 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "bridge_file": { "type": "string", "minLength": 1 },
-    "path": { "type": "string", "minLength": 1 },
-    "tab": { "type": "string", "minLength": 1, "maxLength": 64 },
-    "overwrite": { "type": "boolean", "default": false }
+    "bridge_file": {
+      "type": "string",
+      "minLength": 1
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tab": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "overwrite": {
+      "type": "boolean",
+      "default": false
+    },
+    "target": {
+      "type": "string",
+      "enum": [
+        "main",
+        "studio",
+        "window",
+        "modal",
+        "active_modal",
+        "active",
+        "active_window",
+        "native",
+        "native_window",
+        "active_native",
+        "screen",
+        "desktop",
+        "pilot_review"
+      ]
+    }
   }
 }

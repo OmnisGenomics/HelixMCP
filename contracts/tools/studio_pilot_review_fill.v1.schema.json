@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "bridge_file": {
+      "type": "string",
+      "minLength": 1
+    },
+    "answers": {
+      "$ref": "helixmcp:common#/$defs/WorkflowEvaluationAnswers"
+    }
+  },
+  "required": [
+    "answers"
+  ],
+  "additionalProperties": false,
+  "$id": "helixmcp:tool:studio_pilot_review_fill:v1",
+  "title": "studio_pilot_review_fill input"
+}

@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { mkdtemp, rm, writeFile } from "fs/promises";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { mkdtemp, rm, readFile, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
 import * as net from "node:net";
@@ -19,11 +19,13 @@ import { ArtifactService } from "../src/artifacts/artifactService.js";
 import { PolicyEngine } from "../src/policy/policy.js";
 import { createGatewayServer } from "../src/mcp/gatewayServer.js";
 import { DefaultExecutionService } from "../src/execution/executionService.js";
+import type { ArtifactId, ProjectId, RunId } from "../src/core/ids.js";
 
 describe.sequential("studio bridge gateway tools", () => {
   let tmpDir: string;
   let pool: pg.Pool;
   let store: PostgresStore;
+  let artifacts: ArtifactService;
   let policy: PolicyEngine;
   let client: Client;
   let serverTransport: InMemoryTransport;
@@ -48,7 +50,7 @@ describe.sequential("studio bridge gateway tools", () => {
     const db = createDb(pool);
     store = new PostgresStore(db);
     const objects = new LocalObjectStore(path.join(tmpDir, "objects"));
-    const artifacts = new ArtifactService(store, objects);
+    artifacts = new ArtifactService(store, objects);
     policy = await PolicyEngine.loadFromFile(path.resolve("policies/default.policy.yaml"));
     const runsDir = path.join(tmpDir, "runs");
     const execution = new DefaultExecutionService({ policy });
@@ -287,6 +289,99 @@ describe.sequential("studio bridge gateway tools", () => {
       ]);
     } finally {
       await new Promise<void>((resolve) => bridgeServer.close(() => resolve()));
+    }
+  });
+
+  it("binds ZIP inputs, rejects schema/state bypass, and registers the observation output", async () => {
+    const bridgeFile = path.join(tmpDir, "review-bridge.json");
+    const commands: string[] = [];
+    let review: Record<string, unknown> = {
+      visible: false, status: "Automated mock bridge fixture", integrity_verified: false,
+      candidate_count: 0, manifest_sha256: null, observation_state: "pending",
+      export_enabled: false, exported_path: null
+    };
+    let recordedAnswers: unknown;
+    const fixtureAnswers = {
+      schema: "helix.workflow_evaluation.answers.v1",
+      tasks: Object.fromEntries(["compare_candidates","inspect_assumptions","explain_decision","verify_package"].map((name) => [name,{status:"skipped",assistance_needed:false,notes:"Automated mocked gateway fixture"}])),
+      selected_candidate_id: null, alternatives_considered: [], decision_rationale: "",
+      assumptions: [], change_explanation: null, intent_to_export_seconds: null,
+      manual_handoffs_removed: null, return_visit: false, would_use_again: null
+    };
+    const listener = net.createServer((socket) => {
+      let buffer = "";
+      socket.setEncoding("utf8");
+      socket.on("data", async (chunk) => {
+        buffer += chunk;
+        if (!buffer.includes("\n")) return;
+        const {command, params} = JSON.parse(buffer.split("\n")[0]!);
+        commands.push(command);
+        try {
+          if (command === "pilot_review_open") {
+            expect(await readFile(params.package, "utf8")).toBe("ZIP mock fixture");
+            expect(await readFile(params.baseline, "utf8")).toBe("ZIP mock fixture");
+            review = {...review,visible:true,integrity_verified:true,candidate_count:3,manifest_sha256:"c".repeat(64)};
+          } else if (command === "pilot_review_start") {
+            review = {...review,observation_state:"started",export_enabled:true};
+          } else if (command === "pilot_review_fill") {
+            if (review.observation_state !== "started") throw new Error("start an observation before entering answers");
+            recordedAnswers = params.answers;
+          } else if (command === "pilot_review_export") {
+            await writeFile(params.path, JSON.stringify({schema:"automated.mock.gateway.fixture",answers:recordedAnswers}));
+            review = {...review,observation_state:"finished",export_enabled:false,exported_path:params.path};
+          }
+          socket.end(JSON.stringify({ok:true,command,bridge:bridgeInfo,pilot_review:review}) + "\n");
+        } catch(error) {
+          socket.end(JSON.stringify({ok:false,error:String(error)}) + "\n");
+        }
+      });
+    });
+    await new Promise<void>((resolve) => listener.listen(0,"127.0.0.1",resolve));
+    const address = listener.address() as net.AddressInfo;
+    const bridgeInfo = {bridge_file:bridgeFile,host:"127.0.0.1",port:address.port,pid:process.pid,session_id:"automated-mock-review",started_at:"2026-10-02T00:00:00Z"};
+    await writeFile(bridgeFile,JSON.stringify(bridgeInfo));
+    const projectId = "proj_01ARZ3NDEKTSV4RRFFQ69G5FAV" as ProjectId;
+    const zip = await artifacts.importArtifact({projectId,source:{kind:"inline_text",text:"ZIP mock fixture"},typeHint:"ZIP",label:"fixture.zip",createdByRunId:null,maxBytes:null});
+    const wrong = await artifacts.importArtifact({projectId,source:{kind:"inline_text",text:"plain text"},typeHint:"TEXT",label:"wrong.txt",createdByRunId:null,maxBytes:null});
+    try {
+      const before = await callTool("studio_pilot_review_get_state",{bridge_file:bridgeFile});
+      expect((before.structuredContent as any).pilot_review.visible).toBe(false);
+      const badType = await callTool("studio_pilot_review_open",{bridge_file:bridgeFile,package_artifact_id:wrong.artifactId});
+      expect(badType.isError).toBe(true);
+      expect(commands).toEqual(["pilot_review_state"]);
+      const opened = await callTool("studio_pilot_review_open",{bridge_file:bridgeFile,package_artifact_id:zip.artifactId,baseline_artifact_id:zip.artifactId});
+      const open = opened.structuredContent as any;
+      expect(open.pilot_review.candidate_count).toBe(3);
+      expect(await store.listRunInputs(open.provenance_run_id as RunId)).toEqual([
+        {artifactId:zip.artifactId,role:"package"},{artifactId:zip.artifactId,role:"baseline"}
+      ]);
+      const tooEarly = await callTool("studio_pilot_review_fill",{bridge_file:bridgeFile,answers:fixtureAnswers});
+      expect(tooEarly.isError).toBe(true);
+      const beforeInvalid = commands.length;
+      const badAnswers = await callTool("studio_pilot_review_fill",{bridge_file:bridgeFile,answers:{...fixtureAnswers,approved:true}});
+      expect(badAnswers.isError).toBe(true);
+      expect(commands.length).toBe(beforeInvalid);
+      const started = await callTool("studio_pilot_review_start",{bridge_file:bridgeFile,study_id:"automated-study",participant_id:"automated-fixture"});
+      expect((started.structuredContent as any).pilot_review.observation_state).toBe("started");
+      await callTool("studio_pilot_review_fill",{bridge_file:bridgeFile,answers:fixtureAnswers});
+      const exported = await callTool("studio_pilot_review_export",{bridge_file:bridgeFile});
+      const result = exported.structuredContent as any;
+      expect(result.pilot_review.observation_state).toBe("finished");
+      const outputs = await store.listRunOutputs(result.provenance_run_id as RunId);
+      expect(outputs).toContainEqual({artifactId:result.observation_artifact_id,role:"observation"});
+      const observation = await artifacts.getArtifact(result.observation_artifact_id as ArtifactId);
+      expect(observation?.checksumSha256).toBe(result.observation_checksum_sha256);
+      expect(observation?.type).toBe("JSON");
+      expect(JSON.parse(await readFile(result.pilot_review.exported_path,"utf8")).answers).toEqual(fixtureAnswers);
+      const beforeDenied = commands.length;
+      const deny = vi.spyOn(policy,"assertToolAllowed").mockImplementation(() => {throw new Error("policy denied reviewer fixture");});
+      try {
+        const denied = await callTool("studio_pilot_review_get_state",{bridge_file:bridgeFile});
+        expect(denied.isError).toBe(true);
+        expect(commands.length).toBe(beforeDenied);
+      } finally {deny.mockRestore();}
+    } finally {
+      await new Promise<void>((resolve) => listener.close(() => resolve()));
     }
   });
 });

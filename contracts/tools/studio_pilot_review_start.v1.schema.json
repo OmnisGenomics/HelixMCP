@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "bridge_file": {
+      "type": "string",
+      "minLength": 1
+    },
+    "study_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$"
+    },
+    "participant_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$"
+    },
+    "role": {
+      "default": "reviewer",
+      "type": "string",
+      "enum": [
+        "reviewer",
+        "author"
+      ]
+    }
+  },
+  "required": [
+    "study_id",
+    "participant_id"
+  ],
+  "additionalProperties": false,
+  "$id": "helixmcp:tool:studio_pilot_review_start:v1",
+  "title": "studio_pilot_review_start input"
+}

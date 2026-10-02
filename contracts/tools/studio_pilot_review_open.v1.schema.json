@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "bridge_file": {
+      "type": "string",
+      "minLength": 1
+    },
+    "package_artifact_id": {
+      "type": "string",
+      "pattern": "^art_[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "baseline_artifact_id": {
+      "type": "string",
+      "pattern": "^art_[0-9A-HJKMNP-TV-Z]{26}$"
+    }
+  },
+  "required": [
+    "package_artifact_id"
+  ],
+  "additionalProperties": false,
+  "$id": "helixmcp:tool:studio_pilot_review_open:v1",
+  "title": "studio_pilot_review_open input"
+}

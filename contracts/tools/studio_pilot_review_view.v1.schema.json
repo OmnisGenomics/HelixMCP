@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "bridge_file": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tab_index": {
+      "default": 0,
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3
+    },
+    "width": {
+      "type": "integer",
+      "minimum": 680,
+      "maximum": 7680
+    },
+    "height": {
+      "type": "integer",
+      "minimum": 480,
+      "maximum": 4320
+    },
+    "scroll_y": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "additionalProperties": false,
+  "$id": "helixmcp:tool:studio_pilot_review_view:v1",
+  "title": "studio_pilot_review_view input",
+  "dependentRequired": {
+    "width": [
+      "height"
+    ],
+    "height": [
+      "width"
+    ]
+  }
+}

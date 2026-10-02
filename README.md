@@ -25,6 +25,14 @@ npm test
 HELIXMCP_TEST_DOCKER=1 npm test
 ```
 
+## Live Studio GUI testing
+
+The existing gateway exposes Studio state, EVS loading, tab navigation,
+visualization edits, screenshots, and pilot reviewer tools. Pilot packages enter
+as ZIP artifacts; reviewer observations and screenshots leave as artifacts with
+run provenance. See [the GUI testing guide](docs/studio_gui_testing.md) for setup,
+tool arguments, and a live stdio MCP smoke using synthetic inputs.
+
 ## Nix CI
 
 `nix flake check` builds HelixMCP and runs the TypeScript typecheck plus the

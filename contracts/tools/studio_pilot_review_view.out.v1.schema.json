@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "helixmcp:tool:studio_pilot_review_view:out:v1",
+  "title": "studio_pilot_review_view output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "provenance_run_id",
+    "bridge",
+    "pilot_review",
+    "log_artifact_id"
+  ],
+  "properties": {
+    "provenance_run_id": {
+      "$ref": "helixmcp:common#/$defs/RunId"
+    },
+    "bridge": {
+      "$ref": "helixmcp:common#/$defs/StudioBridgeInfo"
+    },
+    "pilot_review": {
+      "$ref": "helixmcp:common#/$defs/StudioPilotReviewState"
+    },
+    "log_artifact_id": {
+      "$ref": "helixmcp:common#/$defs/ArtifactId"
+    }
+  }
+}

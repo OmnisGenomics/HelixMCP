@@ -25,6 +25,7 @@ import { envSnapshot } from "./envSnapshot.js";
 import { registerToolDefinitions } from "../toolpacks/register.js";
 import { builtinToolDefinitions } from "../toolpacks/builtin/index.js";
 import { callStudioBridge } from "./studioBridgeClient.js";
+import { registerStudioReviewTools } from "./studioReviewTools.js";
 import {
   zArtifactGetInput,
   zArtifactGetOutput,
@@ -99,7 +100,7 @@ function toArtifactSummary(a: ArtifactRecord): JsonObject {
 export function createGatewayServer(deps: GatewayDeps): McpServer {
   const mcp = new McpServer({
     name: "helixmcp-biomcp-fabric-gateway",
-    version: "1.0.1"
+    version: "1.1.0"
   });
 
   const slurmSubmitter = deps.slurmSubmitter ?? new SbatchSubmitter();
@@ -204,6 +205,10 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
     { policy: deps.policy, store: deps.store, artifacts: deps.artifacts, runsDir: deps.runsDir, slurmSubmitter },
     builtinToolDefinitions
   );
+
+  registerStudioReviewTools(mcp, {
+    artifacts: deps.artifacts, runsDir: deps.runsDir, projectId: STUDIO_BRIDGE_PROJECT_ID
+  }, runStudioInteractiveTool);
 
   mcp.registerTool(
     "studio_get_state",
@@ -419,19 +424,22 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
           bridge_file: args.bridge_file ?? null,
           path: args.path ?? null,
           tab: args.tab ?? null,
+          target: args.target ?? null,
           overwrite: args.overwrite
         },
         extra,
         async (toolRun) => {
           await toolRun.event("studio.command", "capture_screenshot", {
             path: args.path ?? null,
-            tab: args.tab ?? null
+            tab: args.tab ?? null,
+            target: args.target ?? null
           });
           const raw = (await callStudioBridge(
             "capture_screenshot",
             {
               path: args.path,
               tab: args.tab,
+              target: args.target,
               overwrite: args.overwrite
             },
             studioBridgeOptions(args.bridge_file, 15_000)
@@ -466,7 +474,8 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
               device_pixel_ratio: Number(raw.screenshot?.device_pixel_ratio ?? 1),
               size_bytes: artifact.sizeBytes.toString(),
               checksum_sha256: artifact.checksumSha256,
-              captured_at: String(raw.screenshot?.captured_at || "")
+              captured_at: String(raw.screenshot?.captured_at || ""),
+              target: raw.screenshot?.target ?? null
             }
           };
         }

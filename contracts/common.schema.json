@@ -131,8 +131,286 @@
         "device_pixel_ratio": { "type": "number", "exclusiveMinimum": 0 },
         "size_bytes": { "type": "string" },
         "checksum_sha256": { "$ref": "helixmcp:common#/$defs/Sha256" },
-        "captured_at": { "type": "string", "minLength": 1 }
+        "captured_at": { "type": "string", "minLength": 1 },
+        "target": { "anyOf": [{ "type": "object", "additionalProperties": true }, { "type": "null" }] }
       }
+    },
+    "StudioPilotReviewState": {
+      "type": "object",
+      "properties": {
+        "visible": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string"
+        },
+        "integrity_verified": {
+          "type": "boolean"
+        },
+        "candidate_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "manifest_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observation_state": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "started",
+            "finished"
+          ]
+        },
+        "export_enabled": {
+          "type": "boolean"
+        },
+        "exported_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "visible",
+        "status",
+        "integrity_verified",
+        "candidate_count",
+        "manifest_sha256",
+        "observation_state",
+        "export_enabled",
+        "exported_path"
+      ],
+      "additionalProperties": false
+    },
+    "WorkflowEvaluationAnswers": {
+      "additionalProperties": false,
+      "properties": {
+        "alternatives_considered": {
+          "items": {
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "assumptions": {
+          "items": {
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "change_explanation": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "decision_rationale": {
+          "type": "string"
+        },
+        "intent_to_export_seconds": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "manual_handoffs_removed": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "return_visit": {
+          "type": "boolean"
+        },
+        "schema": {
+          "const": "helix.workflow_evaluation.answers.v1"
+        },
+        "selected_candidate_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tasks": {
+          "additionalProperties": false,
+          "properties": {
+            "compare_candidates": {
+              "additionalProperties": false,
+              "properties": {
+                "assistance_needed": {
+                  "type": "boolean"
+                },
+                "notes": {
+                  "minLength": 1,
+                  "pattern": "\\S",
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "completed",
+                    "blocked",
+                    "skipped"
+                  ]
+                }
+              },
+              "required": [
+                "status",
+                "assistance_needed",
+                "notes"
+              ],
+              "type": "object"
+            },
+            "explain_decision": {
+              "additionalProperties": false,
+              "properties": {
+                "assistance_needed": {
+                  "type": "boolean"
+                },
+                "notes": {
+                  "minLength": 1,
+                  "pattern": "\\S",
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "completed",
+                    "blocked",
+                    "skipped"
+                  ]
+                }
+              },
+              "required": [
+                "status",
+                "assistance_needed",
+                "notes"
+              ],
+              "type": "object"
+            },
+            "inspect_assumptions": {
+              "additionalProperties": false,
+              "properties": {
+                "assistance_needed": {
+                  "type": "boolean"
+                },
+                "notes": {
+                  "minLength": 1,
+                  "pattern": "\\S",
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "completed",
+                    "blocked",
+                    "skipped"
+                  ]
+                }
+              },
+              "required": [
+                "status",
+                "assistance_needed",
+                "notes"
+              ],
+              "type": "object"
+            },
+            "verify_package": {
+              "additionalProperties": false,
+              "properties": {
+                "assistance_needed": {
+                  "type": "boolean"
+                },
+                "notes": {
+                  "minLength": 1,
+                  "pattern": "\\S",
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "completed",
+                    "blocked",
+                    "skipped"
+                  ]
+                }
+              },
+              "required": [
+                "status",
+                "assistance_needed",
+                "notes"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compare_candidates",
+            "inspect_assumptions",
+            "explain_decision",
+            "verify_package"
+          ],
+          "type": "object"
+        },
+        "would_use_again": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "schema",
+        "tasks",
+        "selected_candidate_id",
+        "alternatives_considered",
+        "decision_rationale",
+        "assumptions",
+        "change_explanation",
+        "intent_to_export_seconds",
+        "manual_handoffs_removed",
+        "return_visit",
+        "would_use_again"
+      ],
+      "type": "object",
+      "$comment": "Helix workflow_answers_v1 snapshot. SDK and published contracts preserve v1 fields; observations confer no approval."
     }
   }
 }

@@ -21,7 +21,7 @@ export interface StudioBridgeCallOptions {
 }
 
 export function defaultStudioBridgeFile(): string {
-  return process.env.HELIX_STUDIO_MCP_BRIDGE_FILE || path.join(os.tmpdir(), "helix-studio-mcp-bridge.json");
+  return process.env.HELIX_STUDIO_MCP_BRIDGE_FILE || process.env.OMNIS_HELIX_MCP_BRIDGE_FILE || path.join(os.tmpdir(), "helix-studio-mcp-bridge.json");
 }
 
 export async function readStudioBridgeInfo(bridgeFile?: string): Promise<StudioBridgeInfo> {
@@ -33,6 +33,9 @@ export async function readStudioBridgeInfo(bridgeFile?: string): Promise<StudioB
   const sessionId = String(payload.session_id || "").trim();
   const startedAt = String(payload.started_at || "").trim();
   if (!host) throw new Error(`studio bridge info missing host in ${resolved}`);
+  if (!["127.0.0.1", "::1", "localhost"].includes(host)) {
+    throw new Error("Studio bridge must use a loopback host");
+  }
   if (!Number.isInteger(port) || port <= 0 || port > 65535) {
     throw new Error(`studio bridge info has invalid port in ${resolved}`);
   }
@@ -82,6 +85,8 @@ export async function callStudioBridge(
     socket.setEncoding("utf8");
     socket.setTimeout(timeoutMs, () => fail(new Error(`studio bridge timed out after ${timeoutMs} ms`)));
     socket.once("error", (error) => fail(error instanceof Error ? error : new Error(String(error))));
+    socket.once("end", () => fail(new Error("studio bridge closed before a complete response")));
+    socket.once("close", () => fail(new Error("studio bridge closed before a complete response")));
     socket.on("data", (chunk: string) => {
       if (settled) return;
       buffer += chunk;
