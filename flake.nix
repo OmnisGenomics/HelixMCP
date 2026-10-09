@@ -50,7 +50,8 @@
             checkPhase = ''
               runHook preCheck
               export TMPDIR=/tmp
-              npm run ${script}
+              export GOMAXPROCS="$NIX_BUILD_CORES"
+              npm run ${script} ${pkgs.lib.optionalString (script == "test") ''-- --maxWorkers="$NIX_BUILD_CORES"''}
               runHook postCheck
             '';
             doCheck = true;
