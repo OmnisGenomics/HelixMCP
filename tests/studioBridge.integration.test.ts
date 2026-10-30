@@ -270,6 +270,8 @@ describe.sequential("studio bridge gateway tools", () => {
       expect(commands.at(-1)).toEqual({ command: "prime_wizard_fill", params: { inputs: { rtt: "ACGT" } } });
       await callTool("studio_prime_workflow",{bridge_file:bridgeFile,action:"wizard_fill",inputs:{edit_kind:"INSERTION",inserted_sequence:"AG"}});
       expect(commands.at(-1)).toEqual({command:"prime_wizard_fill",params:{inputs:{edit_kind:"INSERTION",inserted_sequence:"AG"}}});
+      await callTool("studio_prime_workflow",{bridge_file:bridgeFile,action:"wizard_fill",inputs:{edit_kind:"DELETION",deletion_length:"2"}});
+      expect(commands.at(-1)).toEqual({command:"prime_wizard_fill",params:{inputs:{edit_kind:"DELETION",deletion_length:"2"}}});
       const imported = await callTool("artifact_import", {
         project_id: "proj_01ARZ3NDEKTSV4RRFFQ69G5FAV", type_hint: "TEXT",
         source: { kind: "inline_text", text: ">synthetic\nAACCGGTT\n" }
@@ -346,6 +348,7 @@ describe.sequential("studio bridge gateway tools", () => {
         "prime_comparison_export_state",
         "prime_comparison_export",
         "prime_comparison_export_state",
+        "prime_wizard_fill",
         "prime_wizard_fill",
         "prime_wizard_fill",
         "prime_wizard_target",

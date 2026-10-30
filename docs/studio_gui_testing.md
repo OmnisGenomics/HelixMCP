@@ -206,6 +206,22 @@ and incomplete bridge responses. Docker tests remain separately opt-in.
 
 ## Prime insertions (gateway 1.5.0)
 
+Gateway 1.6.0 adds `edit_kind: "DELETION"` and `deletion_length` to wizard inputs;
+`offset` is the zero-based start of the deleted retained-reference interval.
+Studio validates and previews that interval. Review accepts v3 reports for
+deletion/deletion or mixed comparisons; deleted reference positions are gaps,
+with separate string and declared-edit equality. The managed export tool
+registers comparison v3 ZIPs without adding caller-selected paths or approval.
+
+Use `scripts/studio_prime_deletion_smoke.ts` with `--bridge-file`, a new
+`--outdir`, and `--python` for the full native wizard-to-evidence proof. It checks
+invalid/oversized numeric values, the exact interval preview, compatible deletion,
+revision from two to three deleted bases, gapped review, byte-identical exports,
+offline verification, unmodified first-run evidence and an incompatible RTT.
+After restarting the project, `--history-only` checks its registered runs,
+comparison and export without changing the active draft. All data are synthetic;
+counts stay uncalibrated and no unsupported edited sequence is inferred.
+
 `studio_prime_workflow` accepts optional `edit_kind` (`SUBSTITUTION` or
 `INSERTION`) and `inserted_sequence` wizard fields. Insertion uses an explicit
 zero-based reference boundary in `offset`; no source editing or sequence

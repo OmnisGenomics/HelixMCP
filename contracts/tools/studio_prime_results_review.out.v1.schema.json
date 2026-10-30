@@ -57,7 +57,8 @@
           "type": "string",
           "enum": [
             "helix.studio.prime_results_review/v1",
-            "helix.studio.prime_results_review/v2"
+            "helix.studio.prime_results_review/v2",
+            "helix.studio.prime_results_review/v3"
           ]
         },
         "status": {

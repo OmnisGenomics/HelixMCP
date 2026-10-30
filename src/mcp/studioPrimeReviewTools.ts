@@ -20,7 +20,7 @@ export const zPrimeReviewInput = z.object({
   scroll_y: z.number().int().nonnegative().optional()
 }).strict();
 export const zPrimeReviewState = z.object({
-  schema: z.enum(["helix.studio.prime_results_review/v1", "helix.studio.prime_results_review/v2"]), status: z.enum(["empty", "ready", "error"]),
+  schema: z.enum(["helix.studio.prime_results_review/v1", "helix.studio.prime_results_review/v2", "helix.studio.prime_results_review/v3"]), status: z.enum(["empty", "ready", "error"]),
   visible: z.boolean(), run_ids: z.array(z.string()), selected_run_id: z.string().nullable(),
   compare_run_id: z.string().nullable(), previous_design: z.boolean(), full_sequence: z.boolean(),
   scroll_y: z.number().int().nonnegative(), scroll_max: z.number().int().nonnegative(),

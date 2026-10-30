@@ -70,10 +70,15 @@
           "type": "string",
           "enum": [
             "SUBSTITUTION",
-            "INSERTION"
+            "INSERTION",
+            "DELETION"
           ]
         },
         "inserted_sequence": {
+          "type": "string",
+          "maxLength": 10000
+        },
+        "deletion_length": {
           "type": "string",
           "maxLength": 10000
         }

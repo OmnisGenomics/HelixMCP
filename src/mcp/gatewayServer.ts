@@ -103,7 +103,7 @@ function toArtifactSummary(a: ArtifactRecord): JsonObject {
 export function createGatewayServer(deps: GatewayDeps): McpServer {
   const mcp = new McpServer({
     name: "helixmcp-biomcp-fabric-gateway",
-    version: "1.5.0"
+    version: "1.6.0"
   });
 
   const slurmSubmitter = deps.slurmSubmitter ?? new SbatchSubmitter();

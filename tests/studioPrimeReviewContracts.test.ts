@@ -25,8 +25,11 @@ it("accepts declared insertion comparisons in both runtime and published output 
       comparison:{same_reference:true,sequence_comparable:true,different_offsets:null,reasons:[],model_changed:false,
         edited_sequences_equal:true,edit_definitions_equal:false,alignment_difference_columns:[1,3],
         alignment:{coordinate_system:"declared_reference_boundary_alignment/v1",columns:[{kind:"insertion",boundary:1,index:0}],tracks:{Reference:"-",Selected:"A",Previous:"-"}}}}};
-  expect(zPrimeReviewOutput.safeParse(output).success).toBe(true);
-  expect(validate(output)).toBe(true);
+  for(const version of ['v2','v3']){
+    output.prime_review.schema='helix.studio.prime_results_review/'+version;
+    expect(zPrimeReviewOutput.safeParse(output).success).toBe(true);
+    expect(validate(output)).toBe(true);
+  }
   const bad=structuredClone(output);bad.prime_review.comparison.alignment.columns[0]!.boundary=-1;
   expect(zPrimeReviewOutput.safeParse(bad).success).toBe(false);
   expect(validate(bad)).toBe(false);
