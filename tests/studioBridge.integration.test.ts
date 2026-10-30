@@ -189,6 +189,11 @@ describe.sequential("studio bridge gateway tools", () => {
             command: request.command,
             bridge: bridgeInfo,
             state: currentState,
+            ...(request.command.startsWith("prime_") ? { prime: {
+              schema: "helix.studio.prime_automation/v1", wizard: null, run_id: 0,
+              run_in_progress: false, prediction: null, previous_design: false,
+              intent_id: null, bundle: null, verification: "unchecked"
+            } } : {}),
             ...(screenshot ? { screenshot } : {})
           };
           socket.write(`${JSON.stringify(response)}\n`);
@@ -222,6 +227,24 @@ describe.sequential("studio bridge gateway tools", () => {
       const stateSc = state.structuredContent as any;
       expect(stateSc.studio_state.current_tab).toBe("analysis");
       expect(stateSc.log_artifact_id).toMatch(/^art_/);
+
+      const prime = await callTool("studio_prime_workflow", { bridge_file: bridgeFile, action: "get_state" });
+      expect((prime.structuredContent as any).prime.run_in_progress).toBe(false);
+      expect((prime.structuredContent as any).provenance_run_id).toMatch(/^run_/);
+      await callTool("studio_prime_workflow", { bridge_file: bridgeFile, action: "wizard_fill", inputs: { rtt: "ACGT" } });
+      expect(commands.at(-1)).toEqual({ command: "prime_wizard_fill", params: { inputs: { rtt: "ACGT" } } });
+      const imported = await callTool("artifact_import", {
+        project_id: "proj_01ARZ3NDEKTSV4RRFFQ69G5FAV", type_hint: "TEXT",
+        source: { kind: "inline_text", text: ">synthetic\nAACCGGTT\n" }
+      });
+      const targetId = (imported.structuredContent as any).artifact.artifact_id;
+      const loaded = await callTool("studio_prime_workflow", { bridge_file: bridgeFile, action: "wizard_target", target_artifact_id: targetId, synthetic: true });
+      expect(loaded.isError).not.toBe(true);
+      expect(await readFile(commands.at(-1)!.params.path as string, "utf8")).toBe(">synthetic\nAACCGGTT\n");
+      const before = commands.length;
+      const invalid = await callTool("studio_prime_workflow", { bridge_file: bridgeFile, action: "wizard_target", target_artifact_id: targetId });
+      expect(invalid.isError).toBe(true);
+      expect(commands.length).toBe(before);
 
       const open = await callTool("studio_open_tab", { bridge_file: bridgeFile, tab: "visualizations" });
       const openSc = open.structuredContent as any;
@@ -280,6 +303,9 @@ describe.sequential("studio bridge gateway tools", () => {
 
       expect(commands.map((item) => item.command)).toEqual([
         "get_state",
+        "prime_get_state",
+        "prime_wizard_fill",
+        "prime_wizard_target",
         "open_tab",
         "load_evs",
         "set_visualization_state",

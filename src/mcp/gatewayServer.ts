@@ -26,6 +26,7 @@ import { registerToolDefinitions } from "../toolpacks/register.js";
 import { builtinToolDefinitions } from "../toolpacks/builtin/index.js";
 import { callStudioBridge } from "./studioBridgeClient.js";
 import { registerStudioReviewTools } from "./studioReviewTools.js";
+import { registerStudioPrimeTools } from "./studioPrimeTools.js";
 import {
   zArtifactGetInput,
   zArtifactGetOutput,
@@ -100,7 +101,7 @@ function toArtifactSummary(a: ArtifactRecord): JsonObject {
 export function createGatewayServer(deps: GatewayDeps): McpServer {
   const mcp = new McpServer({
     name: "helixmcp-biomcp-fabric-gateway",
-    version: "1.1.0"
+    version: "1.2.0"
   });
 
   const slurmSubmitter = deps.slurmSubmitter ?? new SbatchSubmitter();
@@ -209,6 +210,7 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
   registerStudioReviewTools(mcp, {
     artifacts: deps.artifacts, runsDir: deps.runsDir, projectId: STUDIO_BRIDGE_PROJECT_ID
   }, runStudioInteractiveTool);
+  registerStudioPrimeTools(mcp, { artifacts: deps.artifacts, runsDir: deps.runsDir }, runStudioInteractiveTool);
 
   mcp.registerTool(
     "studio_get_state",

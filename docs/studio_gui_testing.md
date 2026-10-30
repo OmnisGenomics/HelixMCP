@@ -24,7 +24,7 @@ artifact and run records must survive gateway restarts.
 Configure your MCP client's stdio server with `node` as the command,
 `dist/index.js` as the argument, and this repository as its working directory.
 If an existing HelixMCP connection is running, reconnect after rebuilding to
-refresh its tool catalog. The gateway advertises version `1.1.0`.
+refresh its tool catalog. The gateway advertises version `1.2.0`.
 
 Launch Studio from a Helix checkout with a display:
 
@@ -38,6 +38,39 @@ Pass `bridge_file` to the tools when using a custom bridge path. The gateway als
 respects `HELIX_STUDIO_MCP_BRIDGE_FILE` and `OMNIS_HELIX_MCP_BRIDGE_FILE`.
 The bridge must advertise a loopback host. Studio writes both its current and
 legacy bridge filenames; the gateway retains legacy discovery compatibility.
+
+## Prime wizard and simulation
+
+`studio_prime_workflow` drives actual Qt widgets and the existing asynchronous
+Run action. Its bounded `action` values are `get_state`, `wizard_open` (mode
+`new` or `edit`), `wizard_target`, `wizard_fill`, `wizard_navigate` (stage 0–3),
+`wizard_commit`, `run`, and `evidence`. Fill accepts only the six Prime design
+fields. Target loading requires an imported small text/FASTA `target_artifact_id`
+and `synthetic: true`; it materializes and checksum-checks that artifact in the
+run workspace. There is no arbitrary code execution, source replacement, or
+approval action. Studio still enforces evaluation access and wizard validation.
+
+State includes wizard feedback, current run/prediction, previous-design status,
+bundle location and integrity verification text. Open/commit are queued Qt
+operations; poll state until the wizard opens/closes. Run returns immediately;
+poll until `run_in_progress` is false and `run_id` advances. `evidence` opens the
+Evidence panel and invokes its normal integrity verifier. A successful run does
+not mean compatibility or evidence acceptance: inspect the prediction report.
+
+With an isolated live Studio bridge (including native Windows), run:
+
+```powershell
+npx tsx scripts/studio_prime_smoke.ts --bridge-file D:\proof\bridge.json --outdir D:\proof\mcp-run
+```
+
+The output directory must be new. The proof creates a synthetic experiment using
+the wizard, runs a supported RTT, verifies evidence, revises to an incompatible
+RTT, reruns and checks null edited sequence plus preservation of prior evidence.
+It uses an actual stdio MCP client and requires native screenshots. Use
+`--reuse-session` explicitly to rerun against an existing Prime wizard session.
+Start Studio with `PYTHONHASHSEED=0`; Windows native qualification used the real
+`omnis-helix.exe` launcher and `QT_SCALE_FACTOR=1.5`. Automation verifies software
+behavior; category frequencies are uncalibrated and no biological claim follows.
 
 ## Reviewer tools
 

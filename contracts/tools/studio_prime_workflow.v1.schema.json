@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "bridge_file": {
+      "type": "string",
+      "minLength": 1
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "get_state",
+        "wizard_open",
+        "wizard_target",
+        "wizard_fill",
+        "wizard_navigate",
+        "wizard_commit",
+        "run",
+        "evidence"
+      ]
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "new",
+        "edit"
+      ]
+    },
+    "target_artifact_id": {
+      "type": "string",
+      "pattern": "^art_[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "synthetic": {
+      "type": "boolean",
+      "const": true
+    },
+    "stage": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3
+    },
+    "inputs": {
+      "type": "object",
+      "properties": {
+        "spacer": {
+          "type": "string",
+          "maxLength": 10000
+        },
+        "pbs": {
+          "type": "string",
+          "maxLength": 10000
+        },
+        "rtt": {
+          "type": "string",
+          "maxLength": 10000
+        },
+        "offset": {
+          "type": "string",
+          "maxLength": 10000
+        },
+        "reference": {
+          "type": "string",
+          "maxLength": 10000
+        },
+        "alternative": {
+          "type": "string",
+          "maxLength": 10000
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "action"
+  ],
+  "additionalProperties": false,
+  "$id": "helixmcp:tool:studio_prime_workflow:v1"
+}
