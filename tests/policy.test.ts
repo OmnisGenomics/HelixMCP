@@ -79,15 +79,21 @@ describe("PolicyEngine", () => {
   });
 
   it("enforces local_path prefix allowlist", async () => {
-    const policy = await PolicyEngine.loadFromFile(path.resolve("policies/default.policy.yaml"));
     const dir = await mkdtemp(path.join(os.tmpdir(), "helixmcp-policy-"));
+    const basePolicy = await PolicyEngine.loadFromFile(path.resolve("policies/default.policy.yaml"));
+    const config = basePolicy.snapshot() as any;
+    config.imports.local_path_prefix_allowlist = [dir];
+    const policy = new PolicyEngine(config);
+    const outside = await mkdtemp(path.join(os.tmpdir(), "helixmcp-denied-"));
     try {
       const okPath = path.join(dir, "ok.txt");
       await writeFile(okPath, "ok\n");
       await expect(policy.validateLocalPathImport(okPath)).resolves.toBeDefined();
 
+      const denied = path.join(outside, "denied.txt");
+      await writeFile(denied, "denied\n");
       try {
-        await policy.validateLocalPathImport("/etc/passwd");
+        await policy.validateLocalPathImport(denied);
         throw new Error("expected throw");
       } catch (e) {
         expect(e).toBeInstanceOf(McpError);
@@ -96,10 +102,16 @@ describe("PolicyEngine", () => {
       }
 
       const linkPath = path.join(dir, "passwd.link");
-      await symlink("/etc/passwd", linkPath);
-      await expect(policy.validateLocalPathImport(linkPath)).rejects.toBeInstanceOf(McpError);
+      try {
+        await symlink(okPath, linkPath, "file");
+        await expect(policy.validateLocalPathImport(linkPath)).rejects.toBeInstanceOf(McpError);
+      } catch (error: any) {
+        if (error.code !== "EPERM" || process.platform !== "win32") throw error;
+        // Windows without Developer Mode may deny creating the test symlink.
+      }
     } finally {
       await rm(dir, { recursive: true, force: true });
+      await rm(outside, { recursive: true, force: true });
     }
   });
 });

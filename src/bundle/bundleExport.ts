@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
+import { fileURLToPath } from "node:url";
 import { stableJsonStringify, sha256Prefixed } from "../core/canonicalJson.js";
 import type { ArtifactId, RunId } from "../core/ids.js";
 import type { JsonObject } from "../core/json.js";
@@ -74,8 +75,7 @@ function blobSourcePathForArtifact(a: ArtifactRecord, deps: ExportBundleDeps): s
   if (!a.uri.startsWith("file://")) {
     throw new Error(`artifact ${a.artifactId} has unsupported uri scheme (expected file://)`);
   }
-  const filePath = new URL(a.uri).pathname;
-  const decoded = decodeURIComponent(filePath);
+  const decoded = fileURLToPath(a.uri);
   const objectStoreDir = deps.objectStoreDir?.trim();
   if (objectStoreDir) {
     const rel = path.relative(path.resolve(objectStoreDir), path.resolve(decoded));

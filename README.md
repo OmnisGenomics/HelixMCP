@@ -87,3 +87,13 @@ See `SECURITY.md`. Please report vulnerabilities via GitHub Security Advisories 
 ## Stability
 
 See `VERSIONING.md`, `TOOLPACK_ABI_V1.md`, and `EVENTS_V1.md` for the stability contract.
+# Windows runtime
+
+Use Node 20 or newer. Artifact file URIs use native URL/path conversion, including
+drive letters, spaces and reserved characters. Deterministic archive export
+requires GNU tar. On Windows the exporter checks PATH and Git for Windows' bundled
+`usr/bin/tar.exe`; set `HELIXMCP_TAR_BIN` to select an explicit GNU tar executable.
+Windows' bundled BSD tar does not provide the required deterministic options.
+Drive-letter archive paths are treated as local files. A missing GNU tar fails
+with an actionable error rather than creating a differently formatted archive.
+

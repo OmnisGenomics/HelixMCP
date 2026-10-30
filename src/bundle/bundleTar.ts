@@ -6,6 +6,19 @@ import { promisify } from "util";
 
 const execFileAsync = promisify(execFile);
 
+export async function deterministicTarCommand(): Promise<string> {
+  const candidates = process.env.HELIXMCP_TAR_BIN ? [process.env.HELIXMCP_TAR_BIN] : [
+    "tar", ...(process.platform === "win32" ? [path.join(process.env.ProgramFiles || "C:\\Program Files", "Git", "usr", "bin", "tar.exe")] : [])
+  ];
+  for (const command of candidates) {
+    try {
+      const { stdout } = await execFileAsync(command, ["--version"]);
+      if (stdout.includes("GNU tar")) return command;
+    } catch { /* Try the next explicit candidate. */ }
+  }
+  throw new Error("Deterministic bundles require GNU tar; set HELIXMCP_TAR_BIN to its executable.");
+}
+
 async function sha256File(filePath: string): Promise<`sha256:${string}`> {
   const hash = createHash("sha256");
   const fd = await fs.open(filePath, "r");
@@ -25,11 +38,12 @@ async function sha256File(filePath: string): Promise<`sha256:${string}`> {
 export async function bundleDirToDeterministicTar(input: { bundleDir: string; outTarPath: string }): Promise<{
   tarSha256: `sha256:${string}`;
 }> {
-  await execFileAsync("tar", ["--version"]);
+  const tar = await deterministicTarCommand();
   await fs.mkdir(path.dirname(input.outTarPath), { recursive: true });
 
   // Deterministic tar: sorted entries, fixed mtime, numeric owner/group.
-  await execFileAsync("tar", [
+  await execFileAsync(tar, [
+    "--force-local",
     "--sort=name",
     "--mtime=UTC 1970-01-01",
     "--owner=0",

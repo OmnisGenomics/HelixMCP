@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { createReadStream, createWriteStream, promises as fs } from "fs";
 import path from "path";
+import { pathToFileURL } from "node:url";
 import { Transform } from "stream";
 import { pipeline } from "stream/promises";
 import type { ArtifactId } from "../core/ids.js";
@@ -40,7 +41,7 @@ export class LocalObjectStore {
     const objectPath = this.objectPath(artifactId);
     await fs.writeFile(objectPath, bytes);
     return {
-      uri: `file://${objectPath}`,
+      uri: pathToFileURL(objectPath).href,
       sizeBytes: BigInt(bytes.byteLength),
       checksumSha256
     };
@@ -68,7 +69,7 @@ export class LocalObjectStore {
 
     const checksumSha256 = `sha256:${hash.digest("hex")}` as const;
     return {
-      uri: `file://${destinationPath}`,
+      uri: pathToFileURL(destinationPath).href,
       sizeBytes: total,
       checksumSha256
     };

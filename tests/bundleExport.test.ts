@@ -21,7 +21,7 @@ const execFileAsync = promisify(execFile);
 
 describe("bundle_export", () => {
   it("exports a deterministic bundle dir and verifies offline", async () => {
-    const tmpDir = await mkdtemp(path.join(os.tmpdir(), "helixmcp-bundle-"));
+    const tmpDir = await mkdtemp(path.join(os.tmpdir(), "helixmcp-bundle # encoded-"));
     let pool: pg.Pool | null = null;
 
     try {

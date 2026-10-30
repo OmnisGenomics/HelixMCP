@@ -68,7 +68,10 @@ describe.sequential("gateway (in-memory)", () => {
     store = new PostgresStore(db);
     const objects = new LocalObjectStore(path.join(tmpDir, "objects"));
     const artifacts = new ArtifactService(store, objects);
-    policy = await PolicyEngine.loadFromFile(path.resolve("policies/default.policy.yaml"));
+    const basePolicy = await PolicyEngine.loadFromFile(path.resolve("policies/default.policy.yaml"));
+    const config = basePolicy.snapshot() as any;
+    config.imports.local_path_prefix_allowlist = [tmpDir];
+    policy = new PolicyEngine(config);
     const runsDir = path.join(tmpDir, "runs");
     const execution = new DefaultExecutionService({ policy });
 
