@@ -71,7 +71,8 @@
           "enum": [
             "SUBSTITUTION",
             "INSERTION",
-            "DELETION"
+            "DELETION",
+            "REPLACEMENT"
           ]
         },
         "inserted_sequence": {
@@ -79,6 +80,14 @@
           "maxLength": 10000
         },
         "deletion_length": {
+          "type": "string",
+          "maxLength": 10000
+        },
+        "replacement_length": {
+          "type": "string",
+          "maxLength": 10000
+        },
+        "replacement_sequence": {
           "type": "string",
           "maxLength": 10000
         }

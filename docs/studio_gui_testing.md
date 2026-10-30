@@ -206,6 +206,22 @@ and incomplete bridge responses. Docker tests remain separately opt-in.
 
 ## Prime insertions and deletions (gateway 1.6.0)
 
+Gateway 1.7.0 adds replacement authoring with `edit_kind: "REPLACEMENT"`,
+`replacement_length` (reference interval length), `replacement_sequence` and the
+existing zero-based `offset`. The wizard previews the retained reference and
+explicit alternative, validates no-ops and lengths, and uses the runtime model
+for compatibility. Review v4 accepts alignment v2 with required policy
+`replacement_as_declared_delete_insert/v1`. Replacement alternatives occupy
+insertion columns at the declared start and gap the replaced reference interval;
+this does not infer within-interval correspondence. Managed exports use v4 ZIPs.
+
+`scripts/studio_prime_replacement_smoke.ts --bridge-file /path/bridge.json --outdir /new/proof --python /path/python`
+drives the live wizard-to-evidence journey, including invalid/no-op input,
+length-changing revision, comparison, deterministic export, offline verification
+and an incompatible RTT. Add `--history-only` after restarting the project to
+verify read-only history and the same comparison export. All inputs are synthetic;
+counts remain uncalibrated. Earlier tools and contracts remain supported.
+
 Gateway 1.6.0 adds `edit_kind: "DELETION"` and `deletion_length` to wizard inputs;
 `offset` is the zero-based start of the deleted retained-reference interval.
 Studio validates and previews that interval. Review accepts v3 reports for

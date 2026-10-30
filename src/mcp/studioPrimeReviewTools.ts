@@ -6,7 +6,7 @@ import { zArtifactId, zStudioBridgeInfo, zProvenance } from "./toolSchemas.js";
 import type { StudioInteractiveRunner } from "./studioReviewTools.js";
 
 const runId = z.string().min(1).max(160).regex(/^[A-Za-z0-9_.-]+$/);
-const zAlignment = z.object({
+const zAlignmentV1 = z.object({
   coordinate_system: z.literal("declared_reference_boundary_alignment/v1"),
   columns: z.array(z.union([
     z.object({kind:z.literal("reference"), offset:z.number().int().nonnegative()}).strict(),
@@ -14,13 +14,17 @@ const zAlignment = z.object({
   ])),
   tracks:z.object({Reference:z.string(),Selected:z.string().nullable(),Previous:z.string().nullable()}).strict()
 }).strict();
+const zAlignment = z.union([zAlignmentV1,zAlignmentV1.extend({
+  coordinate_system:z.literal("declared_reference_boundary_alignment/v2"),
+  policy:z.literal("replacement_as_declared_delete_insert/v1")
+}).strict()]);
 export const zPrimeReviewInput = z.object({
   bridge_file: z.string().min(1).optional(), action: z.enum(["open", "select", "get_state"]),
   run_id: runId.optional(), compare_run_id: runId.nullable().optional(), full_sequence: z.boolean().optional(),
   scroll_y: z.number().int().nonnegative().optional()
 }).strict();
 export const zPrimeReviewState = z.object({
-  schema: z.enum(["helix.studio.prime_results_review/v1", "helix.studio.prime_results_review/v2", "helix.studio.prime_results_review/v3"]), status: z.enum(["empty", "ready", "error"]),
+  schema: z.enum(["helix.studio.prime_results_review/v1", "helix.studio.prime_results_review/v2", "helix.studio.prime_results_review/v3", "helix.studio.prime_results_review/v4"]), status: z.enum(["empty", "ready", "error"]),
   visible: z.boolean(), run_ids: z.array(z.string()), selected_run_id: z.string().nullable(),
   compare_run_id: z.string().nullable(), previous_design: z.boolean(), full_sequence: z.boolean(),
   scroll_y: z.number().int().nonnegative(), scroll_max: z.number().int().nonnegative(),

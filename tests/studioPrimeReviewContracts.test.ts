@@ -30,6 +30,15 @@ it("accepts declared insertion comparisons in both runtime and published output 
     expect(zPrimeReviewOutput.safeParse(output).success).toBe(true);
     expect(validate(output)).toBe(true);
   }
+  const replacement=structuredClone(output) as any;
+  replacement.prime_review.schema='helix.studio.prime_results_review/v4';
+  replacement.prime_review.comparison.alignment.coordinate_system='declared_reference_boundary_alignment/v2';
+  replacement.prime_review.comparison.alignment.policy='replacement_as_declared_delete_insert/v1';
+  expect(zPrimeReviewOutput.safeParse(replacement).success).toBe(true);
+  expect(validate(replacement)).toBe(true);
+  delete replacement.prime_review.comparison.alignment.policy;
+  expect(zPrimeReviewOutput.safeParse(replacement).success).toBe(false);
+  expect(validate(replacement)).toBe(false);
   const bad=structuredClone(output);bad.prime_review.comparison.alignment.columns[0]!.boundary=-1;
   expect(zPrimeReviewOutput.safeParse(bad).success).toBe(false);
   expect(validate(bad)).toBe(false);
