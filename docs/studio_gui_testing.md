@@ -204,7 +204,7 @@ measured zero, duplicate alternatives, and paired dimensions. Gateway integratio
 tests cover artifact linking, incorrect types, invalid answers, policy denial,
 and incomplete bridge responses. Docker tests remain separately opt-in.
 
-## Prime insertions (gateway 1.5.0)
+## Prime insertions and deletions (gateway 1.6.0)
 
 Gateway 1.6.0 adds `edit_kind: "DELETION"` and `deletion_length` to wizard inputs;
 `offset` is the zero-based start of the deleted retained-reference interval.
