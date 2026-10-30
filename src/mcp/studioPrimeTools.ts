@@ -19,7 +19,8 @@ export const zStudioPrimeInput = z.object({
   synthetic: z.literal(true).optional(),
   stage: z.number().int().min(0).max(3).optional(),
   inputs: z.object({ spacer: field.optional(), pbs: field.optional(), rtt: field.optional(),
-    offset: field.optional(), reference: field.optional(), alternative: field.optional() }).strict().optional()
+    offset: field.optional(), reference: field.optional(), alternative: field.optional(),
+    edit_kind: z.enum(["SUBSTITUTION", "INSERTION"]).optional(), inserted_sequence: field.optional() }).strict().optional()
 }).strict();
 const zPrimeResult = z.object({
   bridge: zStudioBridgeInfo,

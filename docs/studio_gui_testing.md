@@ -203,3 +203,27 @@ snapshot. Contract tests check schema/runtime agreement, including unknown value
 measured zero, duplicate alternatives, and paired dimensions. Gateway integration
 tests cover artifact linking, incorrect types, invalid answers, policy denial,
 and incomplete bridge responses. Docker tests remain separately opt-in.
+
+## Prime insertions (gateway 1.5.0)
+
+`studio_prime_workflow` accepts optional `edit_kind` (`SUBSTITUTION` or
+`INSERTION`) and `inserted_sequence` wizard fields. Insertion uses an explicit
+zero-based reference boundary in `offset`; no source editing or sequence
+generation occurs in the gateway. Existing substitution calls remain valid.
+`studio_prime_results_review` accepts Studio v1/v2 reports. V2 comparison includes
+declared reference/insertion columns, gapped tracks, separate string/edit equality
+and alignment difference indices. Those indices are not reference offsets.
+The managed comparison export tool is unchanged and registers v2 insertion ZIPs.
+
+After launching a native Studio fixture with its bridge enabled:
+
+```bash
+npx tsx scripts/studio_prime_insertion_smoke.ts --bridge-file /path/bridge.json --outdir /new/proof --python /path/python
+# Reopen the same isolated project, then verify saved history:
+npx tsx scripts/studio_prime_insertion_smoke.ts --bridge-file /path/bridge.json --outdir /new/reopen-proof --python /path/python --history-only
+```
+
+The proof uses synthetic retained targets, actual wizard controls and Run action,
+native screenshots, revision, different-length comparison, deterministic export,
+offline verification and preserved historic evidence. Unsupported RTT resolves
+to no edited sequence. Counts remain uncalibrated. These are software checks.

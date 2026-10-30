@@ -6,18 +6,29 @@ import { zArtifactId, zStudioBridgeInfo, zProvenance } from "./toolSchemas.js";
 import type { StudioInteractiveRunner } from "./studioReviewTools.js";
 
 const runId = z.string().min(1).max(160).regex(/^[A-Za-z0-9_.-]+$/);
+const zAlignment = z.object({
+  coordinate_system: z.literal("declared_reference_boundary_alignment/v1"),
+  columns: z.array(z.union([
+    z.object({kind:z.literal("reference"), offset:z.number().int().nonnegative()}).strict(),
+    z.object({kind:z.literal("insertion"), boundary:z.number().int().nonnegative(), index:z.number().int().nonnegative()}).strict()
+  ])),
+  tracks:z.object({Reference:z.string(),Selected:z.string().nullable(),Previous:z.string().nullable()}).strict()
+}).strict();
 export const zPrimeReviewInput = z.object({
   bridge_file: z.string().min(1).optional(), action: z.enum(["open", "select", "get_state"]),
   run_id: runId.optional(), compare_run_id: runId.nullable().optional(), full_sequence: z.boolean().optional(),
   scroll_y: z.number().int().nonnegative().optional()
 }).strict();
 export const zPrimeReviewState = z.object({
-  schema: z.literal("helix.studio.prime_results_review/v1"), status: z.enum(["empty", "ready", "error"]),
+  schema: z.enum(["helix.studio.prime_results_review/v1", "helix.studio.prime_results_review/v2"]), status: z.enum(["empty", "ready", "error"]),
   visible: z.boolean(), run_ids: z.array(z.string()), selected_run_id: z.string().nullable(),
   compare_run_id: z.string().nullable(), previous_design: z.boolean(), full_sequence: z.boolean(),
   scroll_y: z.number().int().nonnegative(), scroll_max: z.number().int().nonnegative(),
   comparison: z.object({ same_reference: z.boolean(), sequence_comparable: z.boolean(),
-    different_offsets: z.array(z.number().int().nonnegative()).nullable(), reasons: z.array(z.string()), model_changed: z.boolean()
+    different_offsets: z.array(z.number().int().nonnegative()).nullable(), reasons: z.array(z.string()), model_changed: z.boolean(),
+    edited_sequences_equal:z.boolean().nullable().optional(), edit_definitions_equal:z.boolean().nullable().optional(),
+    alignment_difference_columns:z.array(z.number().int().nonnegative()).nullable().optional(),
+    alignment:zAlignment.nullable().optional()
   }).strict().nullable().optional(), categories: z.array(z.array(z.string())).optional(),
   selected_compatibility: z.record(z.string(), z.unknown()).nullable().optional(),
   previous_compatibility: z.record(z.string(), z.unknown()).nullable().optional(),

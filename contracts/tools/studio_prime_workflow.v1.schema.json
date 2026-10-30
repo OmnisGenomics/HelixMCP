@@ -65,6 +65,17 @@
         "alternative": {
           "type": "string",
           "maxLength": 10000
+        },
+        "edit_kind": {
+          "type": "string",
+          "enum": [
+            "SUBSTITUTION",
+            "INSERTION"
+          ]
+        },
+        "inserted_sequence": {
+          "type": "string",
+          "maxLength": 10000
         }
       },
       "additionalProperties": false

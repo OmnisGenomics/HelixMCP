@@ -55,7 +55,10 @@
       "properties": {
         "schema": {
           "type": "string",
-          "const": "helix.studio.prime_results_review/v1"
+          "enum": [
+            "helix.studio.prime_results_review/v1",
+            "helix.studio.prime_results_review/v2"
+          ]
         },
         "status": {
           "type": "string",
@@ -144,6 +147,148 @@
                 },
                 "model_changed": {
                   "type": "boolean"
+                },
+                "edited_sequences_equal": {
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "edit_definitions_equal": {
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "alignment_difference_columns": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "alignment": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "coordinate_system": {
+                          "type": "string",
+                          "const": "declared_reference_boundary_alignment/v1"
+                        },
+                        "columns": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "reference"
+                                  },
+                                  "offset": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "offset"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "insertion"
+                                  },
+                                  "boundary": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "index": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "boundary",
+                                  "index"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        },
+                        "tracks": {
+                          "type": "object",
+                          "properties": {
+                            "Reference": {
+                              "type": "string"
+                            },
+                            "Selected": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "Previous": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "Reference",
+                            "Selected",
+                            "Previous"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "coordinate_system",
+                        "columns",
+                        "tracks"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               },
               "required": [

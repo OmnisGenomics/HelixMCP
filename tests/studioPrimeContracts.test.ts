@@ -11,6 +11,8 @@ describe("Prime workflow contract", () => {
       [{ action: "get_state" }, true],
       [{ action: "wizard_navigate", stage: 3 }, true],
       [{ action: "wizard_fill", inputs: { rtt: "ACGT" } }, true],
+      [{ action: "wizard_fill", inputs: { edit_kind:"INSERTION", inserted_sequence:"AG" } }, true],
+      [{ action: "wizard_fill", inputs: { edit_kind:"DELETION" } }, false],
       [{ action: "eval", code: "arbitrary" }, false],
       [{ action: "wizard_navigate", stage: 4 }, false],
       [{ action: "wizard_navigate", stage: true }, false],
