@@ -26,6 +26,7 @@ tool_allowlist:
   - studio_get_state
   - studio_prime_workflow
   - studio_prime_results_review
+  - studio_prime_comparison_export
   - studio_open_tab
   - studio_reset_layout
   - studio_load_evs

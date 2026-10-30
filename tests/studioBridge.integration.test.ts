@@ -3,6 +3,8 @@ import { mkdtemp, rm, readFile, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
 import * as net from "node:net";
+import { writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -79,6 +81,8 @@ describe.sequential("studio bridge gateway tools", () => {
     );
     await writeFile(screenshotPath, pngBytes);
     const commands: Array<{ command: string; params: Record<string, unknown> }> = [];
+    let comparisonState: any = { schema:"helix.studio.prime_comparison_export/v1", status:"idle" };
+    let corruptComparisonChecksum = false;
     let currentState: Record<string, unknown> = {
       current_tab: "analysis",
       available_tabs: ["analysis", "visualizations", "lightcone"],
@@ -184,11 +188,22 @@ describe.sequential("studio bridge gateway tools", () => {
               captured_at: "2026-04-24T18:45:00Z"
             };
           }
+          let comparisonResponse: any = null;
+          if (request.command === "prime_comparison_export") {
+            const bytes = Buffer.from("Automated mock comparison ZIP; core/native tests validate the real archive.");
+            writeFileSync(request.params.path as string, bytes);
+            comparisonState = { schema:"helix.studio.prime_comparison_export/v1",status:"complete",selected_run_id:"revised",previous_run_id:"first",
+              receipt:{schema:"helix.prime_comparison_export/v1",path:request.params.path,size_bytes:bytes.length,
+                sha256:corruptComparisonChecksum ? "0".repeat(64) : createHash("sha256").update(bytes).digest("hex")} };
+            comparisonResponse = {schema:comparisonState.schema,status:"running",selected_run_id:"revised",previous_run_id:"first"};
+          }
+          if(request.command === "prime_comparison_export_state") comparisonResponse = comparisonState;
           const response = {
             ok: true,
             command: request.command,
             bridge: bridgeInfo,
             state: currentState,
+            ...(comparisonResponse ? {comparison_export:comparisonResponse} : {}),
             ...(request.command.startsWith("prime_review_") ? { prime_review: {
               schema: "helix.studio.prime_results_review/v1", status: "empty", visible: true,
               run_ids: [], selected_run_id: null, compare_run_id: null, previous_design: false, full_sequence: false,
@@ -242,6 +257,15 @@ describe.sequential("studio bridge gateway tools", () => {
       const beforeInvalid = commands.length;
       expect((await callTool("studio_prime_results_review", { bridge_file: bridgeFile, action: "select", run_id: "../outside" })).isError).toBe(true);
       expect(commands.length).toBe(beforeInvalid);
+      const exported = await callTool("studio_prime_comparison_export",{bridge_file:bridgeFile});
+      expect(exported.isError).not.toBe(true);
+      const comparisonResult = exported.structuredContent as any;
+      const comparisonArtifact = await artifacts.getArtifact(comparisonResult.comparison_artifact_id as ArtifactId);
+      expect(comparisonArtifact!.type).toBe("ZIP");
+      expect(comparisonArtifact!.checksumSha256).toBe(comparisonResult.comparison_checksum_sha256);
+      expect(await store.listRunOutputs(comparisonResult.provenance_run_id as RunId)).toContainEqual({artifactId:comparisonArtifact!.artifactId,role:"prime_comparison"});
+      corruptComparisonChecksum = true;
+      expect((await callTool("studio_prime_comparison_export",{bridge_file:bridgeFile})).isError).toBe(true);
       await callTool("studio_prime_workflow", { bridge_file: bridgeFile, action: "wizard_fill", inputs: { rtt: "ACGT" } });
       expect(commands.at(-1)).toEqual({ command: "prime_wizard_fill", params: { inputs: { rtt: "ACGT" } } });
       const imported = await callTool("artifact_import", {
@@ -316,6 +340,10 @@ describe.sequential("studio bridge gateway tools", () => {
         "get_state",
         "prime_get_state",
         "prime_review_open",
+        "prime_comparison_export",
+        "prime_comparison_export_state",
+        "prime_comparison_export",
+        "prime_comparison_export_state",
         "prime_wizard_fill",
         "prime_wizard_target",
         "open_tab",

@@ -24,7 +24,7 @@ artifact and run records must survive gateway restarts.
 Configure your MCP client's stdio server with `node` as the command,
 `dist/index.js` as the argument, and this repository as its working directory.
 If an existing HelixMCP connection is running, reconnect after rebuilding to
-refresh its tool catalog. The gateway advertises version `1.3.0`.
+refresh its tool catalog. The gateway advertises version `1.4.0`.
 
 Launch Studio from a Helix checkout with a display:
 
@@ -103,6 +103,37 @@ On a fresh Studio process reopened on that project, run the same script with
 `--history-only` and a new output directory to verify all three registered runs
 and their comparison without replacing its draft. Gateway stderr is retained
 in `gateway.log`, including when a client attempt fails.
+
+## Reviewer tools
+
+## Portable Prime comparison export
+
+Select the two recorded executions with `studio_prime_results_review`, then call
+`studio_prime_comparison_export` with only the optional `bridge_file`. It invokes
+Studio's background exporter, waits for completion, checks the returned path,
+size and SHA-256, and registers a ZIP artifact. The result includes
+`comparison_artifact_id`, `comparison_checksum_sha256` and per-call provenance.
+The gateway owns the output path; callers cannot overwrite arbitrary files.
+
+The ZIP contains deterministic JSON, readable HTML and unchanged source bundles.
+The Helix core verifier checks the ZIP inventory, embedded bundle integrity and
+recomputed comparison/HTML offline. Integrity does not establish calibration,
+authenticate origin or confer approval. Different-reference or unresolved
+comparisons retain those limitations and never invent sequence differences.
+
+The repeatable native proof is:
+
+```powershell
+npx tsx scripts/studio_prime_export_smoke.ts --bridge-file D:\proof\bridge.json --outdir D:\proof\mcp-run --project-root D:\proof\project --python D:\Helix\.venv\Scripts\python.exe
+```
+
+This negative-test harness requires an isolated sibling `project` fixture with
+the `.prime-comparison-fixture` marker and the three synthetic runs produced by
+the review proof. It verifies deterministic exports, registered artifact bytes,
+offline verification and unresolved exports, then temporarily modifies one copied
+input to test rejection. It restores the exact bytes in `finally` and checks all
+source hashes. It never targets the original project. Native captures, operation
+receipts and gateway stderr are retained.
 
 ## Reviewer tools
 
