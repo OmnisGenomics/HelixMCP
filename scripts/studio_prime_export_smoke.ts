@@ -72,6 +72,8 @@ try{
     await call("studio_prime_comparison_export",{bridge_file:values["bridge-file"]},true);
     const invalid=await review("get_state");
     check(invalid.status==="error" && !invalid.alignment,"Changed evidence did not clear the review display");
+    const retained=JSON.parse((await exec(values.python!,["-m","helix.prime.comparison_export","verify",portable],{cwd:outdir,env})).stdout);
+    check(retained.status==="verified","Previously exported immutable evidence became dependent on changed original inputs");
     await capture("changed-input-rejected");
   }finally{await fs.writeFile(changed,saved);}
   for(const [name,hash] of Object.entries(original))check(createHash("sha256").update(await fs.readFile(path.join(source,name))).digest("hex")===hash,"Input evidence changed: "+name);

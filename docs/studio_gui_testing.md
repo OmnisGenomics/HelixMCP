@@ -104,8 +104,6 @@ On a fresh Studio process reopened on that project, run the same script with
 and their comparison without replacing its draft. Gateway stderr is retained
 in `gateway.log`, including when a client attempt fails.
 
-## Reviewer tools
-
 ## Portable Prime comparison export
 
 Select the two recorded executions with `studio_prime_results_review`, then call
@@ -134,6 +132,11 @@ offline verification and unresolved exports, then temporarily modifies one copie
 input to test rejection. It restores the exact bytes in `finally` and checks all
 source hashes. It never targets the original project. Native captures, operation
 receipts and gateway stderr are retained.
+
+Windows qualification on 2026-10-30 used the native launcher at 150% scaling.
+The 16-call MCP proof passed with identical repeat ZIP checksums, 33 copied source
+files unchanged, independent offline verification and rejected changed inputs.
+The local gateway suite passed 41 tests; four Docker opt-in checks were skipped.
 
 ## Reviewer tools
 
