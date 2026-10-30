@@ -25,6 +25,7 @@ tool_allowlist:
   - export_nextflow
   - studio_get_state
   - studio_prime_workflow
+  - studio_prime_results_review
   - studio_open_tab
   - studio_reset_layout
   - studio_load_evs

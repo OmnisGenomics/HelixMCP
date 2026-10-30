@@ -24,7 +24,7 @@ artifact and run records must survive gateway restarts.
 Configure your MCP client's stdio server with `node` as the command,
 `dist/index.js` as the argument, and this repository as its working directory.
 If an existing HelixMCP connection is running, reconnect after rebuilding to
-refresh its tool catalog. The gateway advertises version `1.2.0`.
+refresh its tool catalog. The gateway advertises version `1.3.0`.
 
 Launch Studio from a Helix checkout with a display:
 
@@ -71,6 +71,38 @@ It uses an actual stdio MCP client and requires native screenshots. Use
 Start Studio with `PYTHONHASHSEED=0`; Windows native qualification used the real
 `omnis-helix.exe` launcher and `QT_SCALE_FACTOR=1.5`. Automation verifies software
 behavior; category frequencies are uncalibrated and no biological claim follows.
+
+## Prime Results Review
+
+`studio_prime_results_review` drives the dedicated scientific review page.
+Its `action` is `open`, `select` or `get_state`. Select uses `run_id` and optional
+nullable `compare_run_id` from the displayed registered-run catalog; arbitrary
+paths are rejected. Optional `full_sequence` and `scroll_y` operate the actual
+checkbox and scroll bar. State includes the displayed alignment, category rows,
+reference compatibility/difference report, pending-design flag and scroll range.
+
+Open/select reverify the selected bundles. Invalid evidence clears the result
+display. Sequence differences are available only for matching reference identities
+with resolved conditional sequences. An incompatible RTT has null differences.
+The tool changes viewing state only; it never replaces the draft, creates a
+simulation, alters evidence or grants approval. Edit current experiment in Studio
+always refers to the active draft rather than a selected historical result.
+
+From a new isolated native Studio session:
+
+```powershell
+npx tsx scripts/studio_prime_review_smoke.ts --bridge-file D:\proof\bridge.json --outdir D:\proof\review-run
+```
+
+The actual stdio client creates an experiment through the wizard, runs it,
+revises its alternative allele and RTT together, inspects pending evidence,
+reruns and compares the conditional sequences. It then tests an incompatible
+RTT, category/footer scrolling, full-sequence mode, historical selection and
+unchanged original bundle files. Native screenshots and a receipt are retained.
+On a fresh Studio process reopened on that project, run the same script with
+`--history-only` and a new output directory to verify all three registered runs
+and their comparison without replacing its draft. Gateway stderr is retained
+in `gateway.log`, including when a client attempt fails.
 
 ## Reviewer tools
 

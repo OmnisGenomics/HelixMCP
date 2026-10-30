@@ -189,6 +189,11 @@ describe.sequential("studio bridge gateway tools", () => {
             command: request.command,
             bridge: bridgeInfo,
             state: currentState,
+            ...(request.command.startsWith("prime_review_") ? { prime_review: {
+              schema: "helix.studio.prime_results_review/v1", status: "empty", visible: true,
+              run_ids: [], selected_run_id: null, compare_run_id: null, previous_design: false, full_sequence: false,
+              scroll_y: 0, scroll_max: 0
+            } } : {}),
             ...(request.command.startsWith("prime_") ? { prime: {
               schema: "helix.studio.prime_automation/v1", wizard: null, run_id: 0,
               run_in_progress: false, prediction: null, previous_design: false,
@@ -231,6 +236,12 @@ describe.sequential("studio bridge gateway tools", () => {
       const prime = await callTool("studio_prime_workflow", { bridge_file: bridgeFile, action: "get_state" });
       expect((prime.structuredContent as any).prime.run_in_progress).toBe(false);
       expect((prime.structuredContent as any).provenance_run_id).toMatch(/^run_/);
+      const review = await callTool("studio_prime_results_review", { bridge_file: bridgeFile, action: "open" });
+      expect((review.structuredContent as any).prime_review.schema).toBe("helix.studio.prime_results_review/v1");
+      expect((review.structuredContent as any).log_artifact_id).toMatch(/^art_/);
+      const beforeInvalid = commands.length;
+      expect((await callTool("studio_prime_results_review", { bridge_file: bridgeFile, action: "select", run_id: "../outside" })).isError).toBe(true);
+      expect(commands.length).toBe(beforeInvalid);
       await callTool("studio_prime_workflow", { bridge_file: bridgeFile, action: "wizard_fill", inputs: { rtt: "ACGT" } });
       expect(commands.at(-1)).toEqual({ command: "prime_wizard_fill", params: { inputs: { rtt: "ACGT" } } });
       const imported = await callTool("artifact_import", {
@@ -304,6 +315,7 @@ describe.sequential("studio bridge gateway tools", () => {
       expect(commands.map((item) => item.command)).toEqual([
         "get_state",
         "prime_get_state",
+        "prime_review_open",
         "prime_wizard_fill",
         "prime_wizard_target",
         "open_tab",
