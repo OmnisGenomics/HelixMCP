@@ -94,3 +94,10 @@ this explicitly; its API returns no manifests and no SBOM. See
 [graph recovery](dependency_graph_recovery_2026-10-31.md) for the evidence and
 remote acceptance checks. The earlier reevaluation-discrepancy inference is now
 grounded in that setting; enabling and verifying the graph is the next gate.
+
+The graph recovery follow-up has now enabled the graph and verified all 233
+resolved npm name/version pairs against the unchanged dependency resolutions.
+Both manifests are current. The 102 historical alert records still await
+reevaluation; they have not been dismissed or claimed fixed. The
+[recovery record](dependency_graph_recovery_2026-10-31.md#verified-updated-graph)
+contains the exact SBOM digest, repair commits, checks and remaining gate.

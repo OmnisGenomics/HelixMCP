@@ -88,3 +88,32 @@ trigger its reparse. Parsed JSON was compared with the prior committed lock:
 all 236 installation entries, dependency edges, integrity hashes and metadata
 were identical. No package version, package-manager setting or lock schema was
 changed. This is a one-time ingestion repair, not a new lockfile convention.
+
+## Verified updated graph
+
+After lockfile refresh commit `84bab88`, GitHub's SBOM exported at
+`2026-10-31T04:30:31Z` matched **all 233 unique npm name/version pairs** from
+236 locked installation entries. `security:graph` exited 0 with no missing or
+unexpected pairs. A separate GraphQL query reported two parseable manifests:
+package-lock.json with 233 dependencies and package.json with 13. SDK 1.32.2,
+Vitest 4.1.12 and the patched transitive versions are now in the actual remote
+graph. No dependency-submission snapshot or replacement inventory was used.
+
+Preserved final graph evidence under `D:/Helix/artifacts/`:
+
+- `mcp-graph-sbom-after-lock-refresh-20261031.json`, SHA-256
+  `d84241aec1a1f9d58f7e6f7cba17fa92cc9d948a7c220c35e107abcc6e5521bc`.
+- `mcp-graph-lock-refresh-check-20261031.log`: complete successful comparison.
+- `mcp-graph-upgrade-diff-20261031.json`: GitHub's dependency review independently
+  identifies the removed old SDK and added SDK 1.32.2 without reported findings.
+
+The malformed/disabled-graph export exits 2; the old 227-pair graph exits 1.
+Typecheck, build and all 51 enabled tests passed, with four opt-in tests skipped.
+Both refreshed npm audits reported zero findings. Manifest blob identities were
+verified remotely, and the lockfile reparse change preserves parsed JSON exactly.
+
+**Alert status remains a separate gate.** After graph reconciliation the API
+still listed the original 102 alerts as open, not fixed. No alerts were dismissed.
+The supported browser refresh is pending authenticated sign-in; graph recovery
+does not imply that the downstream alert worker has completed reevaluation.
+`mcp-alerts-reevaluation-poll2-20261031.json` preserves that observation.
