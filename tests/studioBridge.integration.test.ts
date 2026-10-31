@@ -83,6 +83,8 @@ describe.sequential("studio bridge gateway tools", () => {
     const commands: Array<{ command: string; params: Record<string, unknown> }> = [];
     let comparisonState: any = { schema:"helix.studio.prime_comparison_export/v1", status:"idle" };
     let corruptComparisonChecksum = false;
+    let validationState:any={schema:"helix.studio.prime_validation_benchmark/v1",status:"idle"};
+    let validationVerdict="PASS";
     let currentState: Record<string, unknown> = {
       current_tab: "analysis",
       available_tabs: ["analysis", "visualizations", "lightcone"],
@@ -198,12 +200,24 @@ describe.sequential("studio bridge gateway tools", () => {
             comparisonResponse = {schema:comparisonState.schema,status:"running",selected_run_id:"revised",previous_run_id:"first"};
           }
           if(request.command === "prime_comparison_export_state") comparisonResponse = comparisonState;
+          let validationResponse:any=null;
+          if(request.command==="prime_validation_benchmark"){
+            const bytes=Buffer.from("Mock benchmark archive; core/native proofs verify real ZIPs.");
+            writeFileSync(request.params.path as string,bytes);
+            validationState={schema:"helix.studio.prime_validation_benchmark/v1",status:"complete",session_unchanged:true,
+              receipt:{schema:"helix.prime_validation_export/v1",path:request.params.path,sha256:createHash("sha256").update(bytes).digest("hex"),
+                size_bytes:bytes.length,status:validationVerdict,case_count:236,passed_count:validationVerdict==="PASS"?236:235,
+                failed_case_ids:validationVerdict==="PASS"?[]:["fixture-failure"]}};
+            validationResponse={schema:validationState.schema,status:"running"};
+          }
+          if(request.command==="prime_validation_benchmark_state")validationResponse=validationState;
           const response = {
             ok: true,
             command: request.command,
             bridge: bridgeInfo,
             state: currentState,
             ...(comparisonResponse ? {comparison_export:comparisonResponse} : {}),
+            ...(validationResponse?{prime_validation:validationResponse}:{}),
             ...(request.command.startsWith("prime_review_") ? { prime_review: {
               schema: "helix.studio.prime_results_review/v1", status: "empty", visible: true,
               run_ids: [], selected_run_id: null, compare_run_id: null, previous_design: false, full_sequence: false,
@@ -266,6 +280,16 @@ describe.sequential("studio bridge gateway tools", () => {
       expect(await store.listRunOutputs(comparisonResult.provenance_run_id as RunId)).toContainEqual({artifactId:comparisonArtifact!.artifactId,role:"prime_comparison"});
       corruptComparisonChecksum = true;
       expect((await callTool("studio_prime_comparison_export",{bridge_file:bridgeFile})).isError).toBe(true);
+      for(const verdict of ["PASS","FAIL"]){
+        validationVerdict=verdict;
+        const response=await callTool("studio_prime_validation_benchmark",{bridge_file:bridgeFile});
+        expect(response.isError).not.toBe(true);
+        const result=response.structuredContent as any;
+        expect(result.validation.receipt.status).toBe(verdict);
+        const artifact=await artifacts.getArtifact(result.validation_artifact_id as ArtifactId);
+        expect(artifact!.type).toBe("ZIP");expect(artifact!.checksumSha256).toBe(result.validation_checksum_sha256);
+        expect(await store.listRunOutputs(result.provenance_run_id as RunId)).toContainEqual({artifactId:artifact!.artifactId,role:"prime_validation"});
+      }
       await callTool("studio_prime_workflow", { bridge_file: bridgeFile, action: "wizard_fill", inputs: { rtt: "ACGT" } });
       expect(commands.at(-1)).toEqual({ command: "prime_wizard_fill", params: { inputs: { rtt: "ACGT" } } });
       await callTool("studio_prime_workflow",{bridge_file:bridgeFile,action:"wizard_fill",inputs:{edit_kind:"INSERTION",inserted_sequence:"AG"}});
@@ -350,6 +374,10 @@ describe.sequential("studio bridge gateway tools", () => {
         "prime_comparison_export_state",
         "prime_comparison_export",
         "prime_comparison_export_state",
+        "prime_validation_benchmark",
+        "prime_validation_benchmark_state",
+        "prime_validation_benchmark",
+        "prime_validation_benchmark_state",
         "prime_wizard_fill",
         "prime_wizard_fill",
         "prime_wizard_fill",

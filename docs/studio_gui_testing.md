@@ -204,6 +204,34 @@ measured zero, duplicate alternatives, and paired dimensions. Gateway integratio
 tests cover artifact linking, incorrect types, invalid answers, policy denial,
 and incomplete bridge responses. Docker tests remain separately opt-in.
 
+## Prime synthetic validation benchmark (gateway 1.8.0)
+
+`studio_prime_validation_benchmark` accepts only the optional `bridge_file`.
+It starts the pinned Helix benchmark in a live Studio background worker, waits
+for completion, and registers a checksum-checked ZIP in the managed artifact
+store. Output includes `validation`, `validation_artifact_id` and
+`validation_checksum_sha256`. The operation reports `session_unchanged` and a
+PASS/FAIL receipt. A model FAIL remains a registered evidence artifact; execution
+errors remain tool errors. The suite, expectations and output path cannot be
+overridden through this tool. Busy simulations, modals and overlapping jobs are
+refused. No approval or scientific calibration is implied.
+
+Run the complete native Windows proof from the Helix checkout:
+
+```powershell
+./tools/prime_validation_benchmark.ps1 -OutputDirectory artifacts/prime-validation-new -McpRoot D:\HelixMCP
+```
+
+The wrapper builds this gateway and invokes `scripts/studio_prime_validation_smoke.ts`
+using the real stdio SDK and `omnis-helix.exe` at 150% scaling. A NEW directory is
+required. It verifies all 236 synthetic cases with both strands, repeatable
+artifact digests and standalone offline verification, then runs the four edit
+types through the actual wizard (plus-strand fixtures), results review and bundle
+integrity checks. It preserves 44 historical run files and native screenshots,
+checks the benchmark again with an active experiment, and closes only its own
+isolated Studio project. Failed proof receipts/logs are retained. The oracle is
+algorithmically separate, not independently authored or externally audited.
+
 ## Prime insertions and deletions (gateway 1.6.0)
 
 Gateway 1.7.0 adds replacement authoring with `edit_kind: "REPLACEMENT"`,
