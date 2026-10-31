@@ -87,3 +87,10 @@ that GitHub has cleared the alerts or that all security surfaces are qualified.
 API evidence and range comparison are retained as
 `D:/Helix/artifacts/mcp-github-alerts-after-sync-20261031.json` and
 `D:/Helix/artifacts/mcp-github-alerts-range-check-20261031.json`.
+
+Follow-up investigation confirmed that **Dependency graph was disabled** on the
+repository, despite alerts remaining enabled. GitHub's public graph page states
+this explicitly; its API returns no manifests and no SBOM. See
+[graph recovery](dependency_graph_recovery_2026-10-31.md) for the evidence and
+remote acceptance checks. The earlier reevaluation-discrepancy inference is now
+grounded in that setting; enabling and verifying the graph is the next gate.
