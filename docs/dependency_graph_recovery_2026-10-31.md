@@ -142,3 +142,14 @@ If the alert status persists, the remaining supported escalation is the browser'
 Refresh Dependabot alerts control, or GitHub Support with the exact manifest
 blobs, repaired setting, SBOM digest and alert IDs. Neither action was performed
 under the selected API-only scope. Nothing was suppressed or manually closed.
+
+## Subsequent API recheck
+
+At 05:18 UTC on 2026-10-31, all 102 original alerts were still open, with none
+marked fixed and no new open alerts. A newly exported graph still matched all
+233 current npm pairs. Each of the 102 advisory ranges was compared against the
+live graph and exact direct requirements: zero current versions matched.
+See the [complete investigation and alert ledger](github_alert_recheck_2026-10-31.md)
+for all 21 package groups, 102 alert IDs, raw snapshot identities and the remaining
+GitHub alert-status gate. No additional dependency or security-setting change
+was justified or made during that recheck.
