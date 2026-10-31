@@ -79,3 +79,12 @@ establish ingestion of the patched lockfile. The new
 export and compares all 233 current npm pairs, including optional/development
 entries. A default-branch manifest update also provides GitHub its documented
 automatic reparse trigger. Final graph and alert evidence must follow that push.
+
+The subsequent package.json push updated GitHub's package.json graph to SDK
+1.32.2, while its unchanged package-lock.json graph still reported SDK 1.25.3.
+This distinguished a stale per-manifest inventory from a missing package fix.
+A single blank separator was added before the lockfile's `packages` map to
+trigger its reparse. Parsed JSON was compared with the prior committed lock:
+all 236 installation entries, dependency edges, integrity hashes and metadata
+were identical. No package version, package-manager setting or lock schema was
+changed. This is a one-time ingestion repair, not a new lockfile convention.
