@@ -1,5 +1,10 @@
 # GitHub dependency graph recovery — 2026-10-31
 
+**Resolved:** verification at 16:53 UTC confirmed all 102 original alerts fixed,
+zero open alerts and the complete graph still matching the lockfile. See
+[clearance evidence](github_alert_clearance_2026-10-31.md). The intermediate
+pending states below are retained as historical observations.
+
 ## Confirmed cause
 
 The public dependency page for `OmnisGenomics/HelixMCP` explicitly reported
@@ -153,3 +158,13 @@ See the [complete investigation and alert ledger](github_alert_recheck_2026-10-3
 for all 21 package groups, 102 alert IDs, raw snapshot identities and the remaining
 GitHub alert-status gate. No additional dependency or security-setting change
 was justified or made during that recheck.
+
+## Alert-status gate closed
+
+GitHub recorded fixes for all 102 original alerts at 15:06:59–15:07:32 UTC.
+Authenticated verification at 16:53 UTC reconciled every original ID with a fixed
+record, non-null fixed timestamp and null dismissed timestamp. No open alerts
+remain. The signed-in browser showed this result before any refresh action, and
+the API independently confirmed it. All 233 npm pairs still match the lockfile.
+See the [clearance record](github_alert_clearance_2026-10-31.md) for exact evidence
+digests and scope. No manual dismissal or further dependency change was needed.

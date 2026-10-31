@@ -1,13 +1,13 @@
 # MCP dependency remediation — 2026-10-31
 
-Current follow-up: Dependency graph is now enabled and its full resolved npm
-inventory matches the lockfile (233 pairs). GitHub still reports the original
-102 open alerts; API-only verification confirms the graph repair, not alert
-clearance. A fresh 05:18 UTC API recheck confirmed 102 still open, zero marked
-fixed and zero new open alerts. Every reported vulnerable range was checked
-against the live graph and current direct requirements, with zero affected
-matches. See the [per-alert investigation](github_alert_recheck_2026-10-31.md)
-and [graph recovery status](dependency_graph_recovery_2026-10-31.md#final-api-only-status).
+Current status, verified at 16:53 UTC: **zero open GitHub alerts; all 102 original
+alerts marked fixed, none dismissed.** The dependency graph still matches the
+lockfile (233 npm pairs). GitHub's recorded fixes occurred around 15:07 UTC;
+the signed-in browser already showed no open alerts, so no manual refresh was
+needed. See [verified clearance](github_alert_clearance_2026-10-31.md).
+The earlier pending-alert observations and
+[per-alert investigation](github_alert_recheck_2026-10-31.md) are preserved below
+as historical evidence, not the current status.
 
 Scope: the locked HelixMCP JavaScript dependency tree, including development
 tools. Before remediation, npm audit reported 22 dependency findings (2 critical,

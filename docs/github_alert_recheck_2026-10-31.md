@@ -1,5 +1,10 @@
 # GitHub alert API recheck — 2026-10-31
 
+**Historical snapshot:** the pending alerts described below were subsequently
+marked fixed by GitHub. Verification at 16:53 UTC confirmed zero open alerts and
+all 102 originals fixed, with none dismissed. See
+[clearance evidence](github_alert_clearance_2026-10-31.md).
+
 ## Outcome
 
 Checked at `2026-10-31T05:18:29.939Z` against default-branch commit `7f7648e88c289e7f34e8198c0d4d43797412b820`.
