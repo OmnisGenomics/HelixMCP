@@ -3,8 +3,9 @@
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
+  "packageManager": "npm@11.6.2",
   "engines": {
-    "node": ">=20"
+    "node": ">=20.19"
   },
   "scripts": {
     "dev": "tsx src/index.ts",
@@ -12,24 +13,25 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "security:audit": "npm audit --audit-level=low",
     "bundle:export": "tsx scripts/bundle_export.ts",
     "bundle:verify": "tsx scripts/bundle_verify.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.25.3",
-    "ajv": "8.17.1",
-    "kysely": "0.28.10",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "ajv": "8.20.0",
+    "kysely": "0.28.18",
     "pg": "8.17.2",
     "ulid": "3.0.2",
-    "yaml": "2.8.2",
-    "zod": "4.3.6"
+    "yaml": "2.9.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "20.19.30",
     "@types/pg": "8.16.0",
-    "pg-mem": "3.0.5",
-    "tsx": "4.21.0",
+    "pg-mem": "3.0.14",
+    "tsx": "4.23.15",
     "typescript": "5.9.3",
-    "vitest": "4.0.18"
+    "vitest": "4.1.12"
   }
 }
