@@ -9,7 +9,7 @@ import {Client} from "@modelcontextprotocol/sdk/client/index.js";
 import {StdioClientTransport} from "@modelcontextprotocol/sdk/client/stdio.js";
 import {CallToolResultSchema} from "@modelcontextprotocol/sdk/types.js";
 
-const {values}=parseArgs({options:{"helix-root":{type:"string"},python:{type:"string"},outdir:{type:"string"}}});
+const {values}=parseArgs({options:{"helix-root":{type:"string"},python:{type:"string"},outdir:{type:"string"},launcher:{type:"string"},cli:{type:"string"}}});
 if(!values["helix-root"]||!values.python||!values.outdir)throw new Error("--helix-root, --python, --outdir required");
 if(process.platform!=="win32")throw new Error("A native Windows display is required");
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),".."),helix=path.resolve(values["helix-root"]);
@@ -46,10 +46,17 @@ const waitFor=async(predicate:(state:any)=>boolean)=>{
   throw new Error("Timed out waiting for Studio");
 };
 const capture=async(label:string)=>{
-  await sleep(250);
-  const result=await studioCall("studio_capture_screenshot",{path:path.join(outdir,label+".png"),target:"native"});
-  check(result.screenshot.target?.capture_mode==="native_window","Native capture required");
-  return result.screenshot;
+  // Windows can briefly return an empty native surface after a modal closes.
+  // Preserve every attempt, and require a real native capture before proceeding.
+  let last:any;
+  for(let attempt=0;attempt<3;attempt++){
+    await sleep(attempt===0?250:1000);
+    const suffix=attempt===0?"":`-native-retry-${attempt}`;
+    const result=await studioCall("studio_capture_screenshot",{path:path.join(outdir,label+suffix+".png"),target:"native"});
+    last=result.screenshot;
+    if(last.target?.capture_mode==="native_window")return last;
+  }
+  throw new Error("Native capture required: "+JSON.stringify(last?.target));
 };
 const benchmark=async()=>{
   const result=await studioCall("studio_prime_validation_benchmark");
@@ -64,8 +71,12 @@ const historyUnchanged=async()=>{
 let studio:ChildProcess|undefined,bridge:any,startupError:Error|undefined;
 const log=await fs.open(path.join(outdir,"studio.log"),"wx");
 try{
-  studio=spawn(path.join(path.dirname(values.python),"omnis-helix.exe"),[project,"--windowed"],{cwd:helix,windowsHide:true,stdio:["ignore",log.fd,log.fd],
-    env:{...env,QT_QPA_PLATFORM:"windows",QT_SCALE_FACTOR:"1.5",HELIX_DISABLE_USER_CONFIG:"1",OMNIS_HELIX_SKIP_WELCOME:"1",
+  // SW_HIDE is inherited by a frozen GUI's first window. Hide only the source
+  // console launcher; the explicitly supplied GUI executable must be displayed.
+  studio=spawn(values.launcher?path.resolve(values.launcher):path.join(path.dirname(values.python),"omnis-helix.exe"),[project,"--windowed","--screen","primary"],{cwd:outdir,windowsHide:!values.launcher,stdio:["ignore",log.fd,log.fd],
+    env:{...env,PATH:`${process.env.SystemRoot}\\System32;${process.env.SystemRoot}`,PYTHONPATH:"",PYTHONHOME:"",PYTHONNOUSERSITE:"1",
+      USERPROFILE:path.join(outdir,"profile"),APPDATA:path.join(outdir,"profile/roaming"),LOCALAPPDATA:path.join(outdir,"profile/local"),
+      QT_QPA_PLATFORM:"windows",QT_SCALE_FACTOR:"1.5",HELIX_DISABLE_USER_CONFIG:"1",OMNIS_HELIX_SKIP_WELCOME:"1",
       OMNIS_HELIX_SHOW_CRASH_DIALOG:"0",OMNIS_HELIX_ENABLE_MCP_BRIDGE:"1",OMNIS_HELIX_MCP_BRIDGE_FILE:bridgeFile,
       OMNIS_HELIX_SETTINGS_DIR:path.join(outdir,"settings"),OMNIS_HELIX_RECOVERY_DIR:path.join(outdir,"recovery")}});
   studio.once("error",error=>{startupError=error;});
@@ -77,7 +88,11 @@ try{
   }
   check(bridge,"Studio bridge did not appear");
   await client.connect(transport);
-  receipt.initial=await studioCall("studio_get_state");
+  // The bridge file can appear before the cold frozen GUI enters its event loop.
+  for(let attempt=0;attempt<3;attempt++){
+    try{receipt.initial=await studioCall("studio_get_state");break;}
+    catch(error){if(attempt===2||!String(error).includes("bridge timed out"))throw error;await sleep(1000);}
+  }
   check(path.resolve((receipt.initial as any).studio_state.project_root)===project,"Wrong Studio project");
   // Read pinned expected values, never calculate them with production predictors.
   const suite=JSON.parse((await exec(values.python,["-c","from helix.prime.validation_suite import load_fixture_files; print(load_fixture_files()['cases.json'].decode())"],{env,windowsHide:true,maxBuffer:2*1024*1024})).stdout);
@@ -161,7 +176,9 @@ try{
   check(exported.comparison_checksum_sha256===repeatExport.comparison_checksum_sha256,"Comparison archive nondeterministic");
   const comparisonBytes=await fs.readFile(path.join(outdir,"objects",exported.comparison_artifact_id));
   const archive=path.join(outdir,"standalone-assistant-comparison.zip");await fs.writeFile(archive,comparisonBytes,{flag:"wx"});
-  const offline=JSON.parse((await exec(values.python,["-m","helix.prime.comparison_export","verify",archive,"--expected-sha256",digest(comparisonBytes)],{cwd:outdir,env,windowsHide:true})).stdout);
+  const offline=JSON.parse((await exec(values.cli?path.resolve(values.cli):values.python,
+    values.cli?["prime","verify-comparison",archive,"--expected-sha256",digest(comparisonBytes)]:["-m","helix.prime.comparison_export","verify",archive,"--expected-sha256",digest(comparisonBytes)],
+    {cwd:outdir,env,windowsHide:true})).stdout);
   check(offline.status==="verified","Standalone comparison failed verification");
   // Reopening edit restores the selected candidate; a manual override clears it.
   await prime("wizard_open",{mode:"edit"});await waitFor(s=>s.wizard!==null);

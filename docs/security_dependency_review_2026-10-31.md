@@ -61,3 +61,8 @@ Raw before/after reports and test logs are preserved under
 `D:/Helix/artifacts/mcp-security-*`. This review does not assert that unrelated
 GitHub alerts, Python/native dependencies or optional service deployments are
 cleared; those require their own exact inventories.
+
+The final 2026-10-31 recheck again found zero known findings in both audits.
+The patched gateway also passed against the frozen Windows candidate; see
+[frozen Prime qualification](windows_frozen_prime_qualification_2026-10-31.md)
+for the 163-call result and its distinct runtime and scientific boundaries.
