@@ -114,6 +114,31 @@ verified remotely, and the lockfile reparse change preserves parsed JSON exactly
 
 **Alert status remains a separate gate.** After graph reconciliation the API
 still listed the original 102 alerts as open, not fixed. No alerts were dismissed.
-The supported browser refresh is pending authenticated sign-in; graph recovery
-does not imply that the downstream alert worker has completed reevaluation.
 `mcp-alerts-reevaluation-poll2-20261031.json` preserves that observation.
+
+## Final API-only status
+
+The user selected API-only verification and reporting of the remaining alert
+status. No authenticated browser refresh was performed. The final SBOM, exported
+at `2026-10-31T04:34:53Z`, again passed complete comparison: 233 expected and
+233 GitHub npm pairs, zero missing and zero unexpected. Its SHA-256 is
+`c044e2559e7d3ddccfe98cc5e35dd62297f0461172d3c49a05d1fd026f9305c3`.
+
+The final REST alert inventories still show **102 open alerts**, comprising
+3 critical, 38 high, 55 medium and 6 low. All are from the original inventory;
+none of those 102 have become `fixed`. Their reported vulnerable versions are
+absent from the now-current graph. The downstream alert records have not yet
+reconciled; this is not a claim that the alerts are cleared. No additional
+dependency upgrade is justified by those historical ranges.
+
+Final evidence under `D:/Helix/artifacts/`:
+
+- `mcp-graph-api-final-20261031.json` and
+  `mcp-graph-api-final-check-20261031.log`.
+- `mcp-alerts-api-final-20261031.json` and
+  `mcp-alerts-fixed-api-final-20261031.json`.
+
+If the alert status persists, the remaining supported escalation is the browser's
+Refresh Dependabot alerts control, or GitHub Support with the exact manifest
+blobs, repaired setting, SBOM digest and alert IDs. Neither action was performed
+under the selected API-only scope. Nothing was suppressed or manually closed.
