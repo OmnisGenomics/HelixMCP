@@ -61,3 +61,21 @@ Initial authenticated snapshots are retained under `D:/Helix/artifacts/`:
 
 These observations establish the disabled-graph cause. A zero local audit alone
 does not establish successful remote graph recovery or alert clearance.
+
+## Repository-scoped API repair
+
+After the initial findings commit, the documented
+`PUT /repos/OmnisGenomics/HelixMCP/vulnerability-alerts` operation returned 204.
+GitHub documents this as enabling both alerts and the dependency graph. It used
+the existing repository-admin CLI access, requiring neither browser sign-in nor
+organization-write scope. No disable operation, alert dismissal, manual snapshot,
+organization configuration or credential change was performed.
+
+The graph immediately became available: two parseable manifests appeared and
+SBOM export returned 200. Its first inventory was still cached at the old versions
+(227 npm pairs, including SDK 1.25.3). Thus enabling the setting alone did not yet
+establish ingestion of the patched lockfile. The new
+[graph verification command](dependency_graph_verification.md) rejects that stale
+export and compares all 233 current npm pairs, including optional/development
+entries. A default-branch manifest update also provides GitHub its documented
+automatic reparse trigger. Final graph and alert evidence must follow that push.

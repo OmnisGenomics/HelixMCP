@@ -14,6 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "security:audit": "npm audit --audit-level=low",
+    "security:graph": "tsx scripts/verify_dependency_graph.ts",
     "bundle:export": "tsx scripts/bundle_export.ts",
     "bundle:verify": "tsx scripts/bundle_verify.ts"
   },
