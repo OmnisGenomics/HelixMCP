@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "provenance_run_id": {
+      "type": "string",
+      "pattern": "^run_[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "bridge": {
+      "type": "object",
+      "properties": {
+        "bridge_file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "host": {
+          "type": "string",
+          "minLength": 1
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "pid": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "started_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "project_root": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "bridge_file",
+        "host",
+        "port",
+        "pid",
+        "session_id",
+        "started_at"
+      ],
+      "additionalProperties": false
+    },
+    "design_assistant": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "type": "string",
+          "const": "helix.studio.prime_design_assistant/v1"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "idle",
+            "running",
+            "ready",
+            "empty",
+            "error"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "report": {
+          "anyOf": [
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "selection": {
+          "anyOf": [
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schema",
+        "status",
+        "message",
+        "report",
+        "selection"
+      ],
+      "additionalProperties": false
+    },
+    "log_artifact_id": {
+      "type": "string",
+      "pattern": "^art_[0-9A-HJKMNP-TV-Z]{26}$"
+    }
+  },
+  "required": [
+    "provenance_run_id",
+    "bridge",
+    "design_assistant",
+    "log_artifact_id"
+  ],
+  "additionalProperties": false,
+  "$id": "helixmcp:tool:studio_prime_design_assistant:out:v1"
+}

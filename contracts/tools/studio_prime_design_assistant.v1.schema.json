@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "bridge_file": {
+      "type": "string",
+      "minLength": 1
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "generate",
+        "select",
+        "get_state"
+      ]
+    },
+    "pbs_lengths": {
+      "minItems": 1,
+      "maxItems": 16,
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "rtt_lengths": {
+      "minItems": 1,
+      "maxItems": 16,
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 512
+      }
+    },
+    "candidate_id": {
+      "type": "string",
+      "pattern": "^primecand_[a-f0-9]{64}$"
+    }
+  },
+  "required": [
+    "action"
+  ],
+  "additionalProperties": false,
+  "$id": "helixmcp:tool:studio_prime_design_assistant:v1"
+}

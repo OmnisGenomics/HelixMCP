@@ -395,6 +395,40 @@ describe.sequential("studio bridge gateway tools", () => {
     }
   });
 
+  it("routes assistant searches and explicit choices with recorded runs and no override bypass", async () => {
+    const bridgeFile=path.join(tmpDir,"assistant-bridge.json");
+    const commands:Array<{command:string;params:any}>=[];
+    const candidateId="primecand_"+"a".repeat(64);
+    const listener=net.createServer(socket=>{
+      let buffer="";socket.setEncoding("utf8");
+      socket.on("data",chunk=>{
+        buffer+=chunk;if(!buffer.includes("\n"))return;
+        const request=JSON.parse(buffer.split("\n")[0]!);commands.push(request);
+        socket.end(JSON.stringify({ok:true,bridge:info,design_assistant:{schema:"helix.studio.prime_design_assistant/v1",status:"ready",message:"Mocked gateway fixture; native proof checks the actual wizard",report:{candidate_count:1},selection:request.command==="prime_assistant_select"?{candidate:{candidate_id:request.params.candidate_id}}:null}})+"\n");
+      });
+    });
+    await new Promise<void>(resolve=>listener.listen(0,"127.0.0.1",resolve));
+    const info={bridge_file:bridgeFile,host:"127.0.0.1",port:(listener.address() as net.AddressInfo).port,pid:process.pid,session_id:"mock-assistant",started_at:"2026-10-30"};
+    await writeFile(bridgeFile,JSON.stringify(info));
+    try{
+      const missing=await callTool("studio_prime_design_assistant",{bridge_file:bridgeFile,action:"generate"});
+      expect(missing.isError).toBe(true);expect(commands).toHaveLength(0);
+      const generated=await callTool("studio_prime_design_assistant",{bridge_file:bridgeFile,action:"generate",pbs_lengths:[5],rtt_lengths:[16]});
+      expect((generated.structuredContent as any).design_assistant.selection).toBeNull();
+      expect((generated.structuredContent as any).provenance_run_id).toMatch(/^run_/);
+      const bypass=await callTool("studio_prime_design_assistant",{bridge_file:bridgeFile,action:"select",candidate_id:candidateId,rtt_lengths:[16]});
+      expect(bypass.isError).toBe(true);expect(commands).toHaveLength(1);
+      const selected=await callTool("studio_prime_design_assistant",{bridge_file:bridgeFile,action:"select",candidate_id:candidateId});
+      expect((selected.structuredContent as any).design_assistant.selection.candidate.candidate_id).toBe(candidateId);
+      await callTool("studio_prime_design_assistant",{bridge_file:bridgeFile,action:"get_state"});
+      expect(commands).toEqual([
+        {command:"prime_assistant_generate",params:{pbs_lengths:[5],rtt_lengths:[16]}},
+        {command:"prime_assistant_select",params:{candidate_id:candidateId}},
+        {command:"prime_assistant_get_state",params:{}}
+      ]);
+    }finally{await new Promise<void>(resolve=>listener.close(()=>resolve()));}
+  });
+
   it("binds ZIP inputs, rejects schema/state bypass, and registers the observation output", async () => {
     const bridgeFile = path.join(tmpDir, "review-bridge.json");
     const commands: string[] = [];

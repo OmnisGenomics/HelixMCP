@@ -204,6 +204,42 @@ measured zero, duplicate alternatives, and paired dimensions. Gateway integratio
 tests cover artifact linking, incorrect types, invalid answers, policy denial,
 and incomplete bridge responses. Docker tests remain separately opt-in.
 
+## Prime Design Assistant (gateway 1.9.0)
+
+`studio_prime_design_assistant` drives the actual open Prime wizard. Actions are
+`generate`, `get_state`, and `select`. Generation requires explicit `pbs_lengths`
+(1–100) and `rtt_lengths` (1–512), with at most 16 integer choices each. These are
+software bounds, not recommended settings. The retained target and desired edit
+must already be entered through the wizard. Selection requires a current
+`candidate_id`; it populates editable sequence controls only after explicit use.
+No raw target, arbitrary candidate object, scoring, path or approval override is
+accepted. Every call has normalized inputs, a run and a log artifact.
+
+Output `design_assistant` includes `status` (idle/running/ready/empty/error), a
+human-readable `message`, the bounded versioned `report` and optional `selection`.
+Poll `get_state` while generation runs. Stable positional ordering is not a
+success ranking. Target/edit/constraint changes invalidate search results and
+manual sequence overrides clear selection provenance. Before simulation, Helix
+recomputes the selected candidate and binds it into the hashed policy and bundle.
+
+Run the complete native Windows proof from Helix:
+
+```powershell
+./tools/prime_design_assistant.ps1 -OutputDirectory artifacts/prime-assistant-new -McpRoot D:\HelixMCP
+```
+
+The wrapper builds this gateway and invokes `scripts/studio_prime_assistant_smoke.ts`
+through the actual stdio SDK and `omnis-helix.exe` at 150% scaling. It authors only
+desired edit inputs, generates/selects candidates for all four types, verifies
+simulated sequences against frozen expectations and checks selected-candidate
+provenance in verified evidence. It also exercises empty/repeated searches,
+revises to an alternative candidate, compares/exports it, and checks manual
+override without false provenance. Native wizard cases use the retained plus
+strand; core oracle tests and the 236-case live benchmark cover both strands.
+Outputs must go into a NEW directory. Receipts, native screenshots, previous
+run files and failed attempts are retained. This qualifies synthetic software
+consistency, not external scientific review or probability calibration.
+
 ## Prime synthetic validation benchmark (gateway 1.8.0)
 
 `studio_prime_validation_benchmark` accepts only the optional `bridge_file`.

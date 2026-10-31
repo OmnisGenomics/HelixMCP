@@ -30,6 +30,7 @@ import { registerStudioPrimeTools } from "./studioPrimeTools.js";
 import { registerStudioPrimeReviewTools } from "./studioPrimeReviewTools.js";
 import { registerStudioPrimeExportTools } from "./studioPrimeExportTools.js";
 import { registerStudioPrimeValidationTools } from "./studioPrimeValidationTools.js";
+import { registerStudioPrimeAssistantTools } from "./studioPrimeAssistantTools.js";
 import {
   zArtifactGetInput,
   zArtifactGetOutput,
@@ -104,7 +105,7 @@ function toArtifactSummary(a: ArtifactRecord): JsonObject {
 export function createGatewayServer(deps: GatewayDeps): McpServer {
   const mcp = new McpServer({
     name: "helixmcp-biomcp-fabric-gateway",
-    version: "1.8.0"
+    version: "1.9.0"
   });
 
   const slurmSubmitter = deps.slurmSubmitter ?? new SbatchSubmitter();
@@ -217,6 +218,7 @@ export function createGatewayServer(deps: GatewayDeps): McpServer {
   registerStudioPrimeReviewTools(mcp, runStudioInteractiveTool);
   registerStudioPrimeExportTools(mcp, {artifacts:deps.artifacts,runsDir:deps.runsDir,projectId:STUDIO_BRIDGE_PROJECT_ID}, runStudioInteractiveTool);
   registerStudioPrimeValidationTools(mcp, {artifacts:deps.artifacts,runsDir:deps.runsDir,projectId:STUDIO_BRIDGE_PROJECT_ID}, runStudioInteractiveTool);
+  registerStudioPrimeAssistantTools(mcp, runStudioInteractiveTool);
 
   mcp.registerTool(
     "studio_get_state",
