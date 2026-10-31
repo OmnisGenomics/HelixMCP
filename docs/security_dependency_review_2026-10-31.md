@@ -66,3 +66,24 @@ The final 2026-10-31 recheck again found zero known findings in both audits.
 The patched gateway also passed against the frozen Windows candidate; see
 [frozen Prime qualification](windows_frozen_prime_qualification_2026-10-31.md)
 for the 163-call result and its distinct runtime and scientific boundaries.
+
+## GitHub alert status after sync
+
+GitHub's push response and authenticated Dependabot API still reported 102 open
+alerts (3 critical, 38 high, 55 medium, 6 low): 89 reference package-lock.json
+and 13 package.json. They cover 21 package names. This remains an open GitHub
+status, despite the zero-finding npm audits; no alerts were dismissed.
+
+The remote lockfile blob `6e89485ceefc01021080aff378876424bf8cec01` matched
+the pushed local lockfile at gateway qualification commit `23104e9`. Every alert's
+reported vulnerable range was compared with every currently locked version of
+its package using npm's semver implementation (GitHub comma-separated bounds
+normalized as conjunctions). None of the 102 reported ranges matched a locked
+version; one referenced package was absent. Examples: SDK 1.32.2, Vitest mocker
+4.1.12, Vite 8.3.5 and body-parser 2.4.0 are outside their reported ranges.
+This supports a dependency-graph reevaluation discrepancy; it does not establish
+that GitHub has cleared the alerts or that all security surfaces are qualified.
+
+API evidence and range comparison are retained as
+`D:/Helix/artifacts/mcp-github-alerts-after-sync-20261031.json` and
+`D:/Helix/artifacts/mcp-github-alerts-range-check-20261031.json`.
